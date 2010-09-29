@@ -1,0 +1,1 @@
+java -jar C:\project\scala_project\gizzard\gizzard_prefz\dist\prefz\prefz-1.0.jar -f C:\project\scala_project\gizzard\gizzard_prefz\dist\prefz\config\test.conf

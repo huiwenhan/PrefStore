@@ -1,0 +1,10 @@
+dist/*
+*.log
+target/
+.DS_Store
+kestrel/*
+*.hprof.txt
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
