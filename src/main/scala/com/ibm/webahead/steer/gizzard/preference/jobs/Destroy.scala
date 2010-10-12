@@ -11,7 +11,7 @@ object DestroyParser extends com.twitter.gizzard.jobs.UnboundJobParser[Forwardin
       new Preference(
       attributes("userId").asInstanceOf[AnyVal].toLong,
       attributes("itemId").asInstanceOf[AnyVal].toLong,
-      attributes("score").asInstanceOf[Double],
+      attributes("score").asInstanceOf[BigDecimal].doubleValue,
       attributes("source").asInstanceOf[String],
       attributes("action").asInstanceOf[String],
       attributes("createDate").asInstanceOf[Int],

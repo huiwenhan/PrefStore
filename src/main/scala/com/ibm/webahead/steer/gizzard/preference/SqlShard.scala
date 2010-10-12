@@ -18,14 +18,13 @@ class SqlShardFactory(queryEvaluatorFactory: QueryEvaluatorFactory, config: Conf
 
   val TABLE_DDL = """
 CREATE TABLE IF NOT EXISTS %s (
-  userid               BIGINT                   NOT NULL,
-  itemid               BIGINT                   NOT NULL,
+  user_id               BIGINT                   NOT NULL,
+  item_id               BIGINT                   NOT NULL,
   score                 FLOAT                    NOT NULL,
   action                VARCHAR(36)              NOT NULL,
   source                VARCHAR(36)              NOT NULL,
   createdate           INT UNSIGNED             NOT NULL,
-  createtype      		INT 				 NOT NULL DEFAULT 0,
-  PRIMARY KEY (id)
+  createtype      		INT 				 NOT NULL DEFAULT 0
 ) TYPE=INNODB"""
 
   def instantiate(shardInfo: shards.ShardInfo, weight: Int, children: Seq[Shard]) = {
@@ -80,7 +79,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
 
   
   def selectAll(cursor: Cursor, count: Int): (Seq[Preference], Option[Cursor]) = {
-    val rows = queryEvaluator.select("SELECT * FROM " + table + "  LIMIT ?," + count + 1+"order by user_id", cursor)(makePreference(_))
+    val rows = queryEvaluator.select("SELECT * FROM " + table + " order by user_id LIMIT ?," + count + 1+" ", cursor.magnitude.position)(makePreference(_))
     val chomped = rows.take(count)
     val nextCursor = if (chomped.size < rows.size) Some(Cursor(chomped.last.userId)) else None
     (chomped, nextCursor)
@@ -108,7 +107,7 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
   def write(pref: Preference) = {
     val Preference(userId, itemId, score, source, action, createDate, createType) = pref
 
-    queryEvaluator.execute("INSERT INTO " + table + " (userid, itemid, score, source,action,createdate,createtype) VALUES ( ?, ?, ?, ?,?,?,?)",
+    queryEvaluator.execute("INSERT INTO " + table + " (user_id, item_id, score, source,action,createdate,createtype) VALUES ( ?, ?, ?, ?,?,?,?)",
        userId, itemId, score, source, action, createDate, createType)
 
   }
@@ -136,8 +135,8 @@ class SqlShard(private val queryEvaluator: QueryEvaluator, val shardInfo: shards
 
   private def makePreference(pref: ResultSet) = {
     new Preference(
-      pref.getLong("userid"),
-      pref.getLong("itemid"),
+      pref.getLong("user_id"),
+      pref.getLong("item_id"),
       pref.getInt("score"),
       pref.getString("source"),
       pref.getString("action"),

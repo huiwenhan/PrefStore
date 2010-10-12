@@ -33,10 +33,12 @@ object PrefzSpec extends ConfiguredSpecification {
     "row create & read" in {
       prefzService.create(1,1,9999,"TAP","computed", 2, 1)
       prefzService.read(1) must eventually(not(throwA[Exception]))
-      val prefs = prefzService.read(1)
+      var prefs = prefzService.read(1)
       prefs.size mustEqual 1
       prefzService.destroy(prefs.get(0))
-      prefzService.read(1) must eventually(throwA[Exception])
+      //prefzService.read(1) must eventually(throwA[Exception])
+      prefs = prefzService.read(1)
+      prefs.size mustEqual 0
     }
   }
 }
