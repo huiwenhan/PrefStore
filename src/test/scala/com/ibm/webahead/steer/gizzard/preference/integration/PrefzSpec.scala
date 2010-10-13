@@ -31,14 +31,18 @@ object PrefzSpec extends ConfiguredSpecification {
     }
 
     "row create & read" in {
-      prefzService.create(1,1,9999,"TAP","computed", 2, 1)
+      prefzService.create(10,1,9999,"TAP","computed", 2, 1)
       prefzService.read(1) must eventually(not(throwA[Exception]))
-      var prefs = prefzService.read(1)
+      var prefs = prefzService.read(10)
       prefs.size mustEqual 1
-      prefzService.destroy(prefs.get(0))
+      var pref= prefs.get(0)
+      pref.userid mustEqual 10
+      prefzService.destroy(pref)
+      Thread.sleep(1000)
       //prefzService.read(1) must eventually(throwA[Exception])
-      prefs = prefzService.read(1)
-      prefs.size mustEqual 0
+      var prefs2 = prefzService.read(10)
+      //prefs2.get(0).userid mustEqual 10
+      prefs2.size mustEqual 0
     }
   }
 }
