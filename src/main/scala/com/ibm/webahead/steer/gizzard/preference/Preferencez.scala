@@ -5,6 +5,7 @@ import com.twitter.querulous.database.{ApachePoolingDatabaseFactory, MemoizingDa
 import com.twitter.querulous.query.SqlQueryFactory
 import com.twitter.querulous.evaluator.StandardQueryEvaluatorFactory
 import com.twitter.xrayspecs.TimeConversions._
+
 import net.lag.logging.{Logger}
 //import net.lag.logging.{Logger, ThrottledLogger}
 import com.twitter.gizzard.Future
@@ -85,7 +86,7 @@ object Preferencez {
     polymorphicJobParser        += ("Create".r, createJobParser)
     polymorphicJobParser        += ("Destroy".r, destroyJobParser)
 
-    val prefService             = new PrefzService(forwardingManager, prioritizingScheduler, new IdGenerator(config("host.id").toInt))
+    val prefService             = new PrefzService(config,queryEvaluatorFactory,nameServer,forwardingManager, prioritizingScheduler, new IdGenerator(config("host.id").toInt))
 
     State(prefService, prioritizingScheduler, nameServer, com.ibm.webahead.steer.gizzard.preference.jobs.CopyFactory)
   }
