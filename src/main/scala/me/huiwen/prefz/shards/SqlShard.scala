@@ -1,3 +1,20 @@
+/*
+ * Copyright 2011 Hui Wen Han, Inc.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License"); you may
+ * not use this file except in compliance with the License. You may obtain
+ * a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
 package me.huiwen.prefz
 package shards
 
@@ -34,32 +51,23 @@ class SqlShardFactory(
   connection: Connection)
 extends ShardFactory[Shard] {
 
-  val deadlockRetries = 3
-
-  val EDGE_TABLE_DDL = """
+val deadlockRetries = 3
+    
+val PREFERENCE_TABLE_DDL = """
 CREATE TABLE IF NOT EXISTS %s (
-source_id %s NOT NULL,
-position BIGINT NOT NULL,
-updated_at INT UNSIGNED NOT NULL,
-destination_id %s NOT NULL,
-count TINYINT UNSIGNED NOT NULL,
-state TINYINT NOT NULL,
+user_id BIGINT NOT NULL,
+item_id BIGINT NOT NULL,
+source  VARCHAR(36) NOT NULL,
+action  VARCHAR(36) NOT NULL,
+score  FLOAT NOT NULL,
+created INT UNSIGNED NOT NULL,
+create_type TINYINT UNSIGNED NOT NULL,
+status TINYINT NOT NULL,
 
-PRIMARY KEY (source_id, state, position),
+PRIMARY KEY (user_id, item_id, source,action)
 
-UNIQUE unique_source_id_destination_id (source_id, destination_id)
 ) ENGINE=INNODB"""
-
-  val METADATA_TABLE_DDL = """
-CREATE TABLE IF NOT EXISTS %s (
-source_id %s NOT NULL,
-count INT NOT NULL,
-state TINYINT NOT NULL,
-updated_at INT UNSIGNED NOT NULL,
-
-PRIMARY KEY (source_id)
-) ENGINE=INNODB
-"""
+        
 
   def instantiate(shardInfo: ShardInfo, weight: Int) = {
     val queryEvaluator = instantiatingQueryEvaluatorFactory(connection.withHost(shardInfo.hostname))
@@ -77,9 +85,7 @@ PRIMARY KEY (source_id)
       val queryEvaluator = materializingQueryEvaluatorFactory(connection.withHost(shardInfo.hostname).withoutDatabase)
 
       queryEvaluator.execute("CREATE DATABASE IF NOT EXISTS " + connection.database)
-      queryEvaluator.execute(EDGE_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_edges", shardInfo.sourceType, shardInfo.destinationType))
-      queryEvaluator.execute(METADATA_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_metadata", shardInfo.sourceType))
-
+      queryEvaluator.execute(PREFERENCE_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_edges", shardInfo.sourceType, shardInfo.destinationType))
     } catch {
       case e: SQLException => throw new ShardException(e.toString)
       case e: SqlQueryTimeoutException => throw new ShardTimeoutException(e.timeout, shardInfo.id, e)
@@ -105,9 +111,11 @@ extends Shard {
     }
   }
   
-
-
-
+ def selectByUserAndSourceAndAction(userId: Long, source:String,action:String) = {
+    lowLatencyQueryEvaluator.selectOne(SelectSingle, "SELECT * FROM " + tablePrefix + "_preference WHERE user_id = ? AND source = ? and action = ?", userId, source,action) { row =>
+      makePreference(row)
+    }
+  }
   private def opposite(direction: String) = direction match {
     case "ASC" => "DESC"
     case "DESC" => "ASC"
