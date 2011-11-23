@@ -14,34 +14,33 @@
  * limitations under the License.
  */
 
-
 package me.huiwen.prefz
 package shards
 
 import java.util.Random
-import java.sql.{BatchUpdateException, ResultSet, SQLException, SQLIntegrityConstraintViolationException}
+import java.sql.{ BatchUpdateException, ResultSet, SQLException, SQLIntegrityConstraintViolationException }
 import scala.collection.mutable
 import com.twitter.gizzard.proxy.SqlExceptionWrappingProxyFactory
 import com.twitter.gizzard.Stats
 import com.twitter.gizzard.shards._
 import com.twitter.querulous.config.Connection
-import com.twitter.querulous.evaluator.{QueryEvaluator, QueryEvaluatorFactory, Transaction}
+import com.twitter.querulous.evaluator.{ QueryEvaluator, QueryEvaluatorFactory, Transaction }
 import com.twitter.querulous.query
-import com.twitter.querulous.query.{QueryClass => QuerulousQueryClass, SqlQueryTimeoutException}
+import com.twitter.querulous.query.{ QueryClass => QuerulousQueryClass, SqlQueryTimeoutException }
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import com.mysql.jdbc.exceptions.MySQLTransactionRollbackException
 import me.huiwen.prefz._
 
 object QueryClass {
-  val Select       = QuerulousQueryClass.Select
-  val Execute      = QuerulousQueryClass.Execute
+  val Select = QuerulousQueryClass.Select
+  val Execute = QuerulousQueryClass.Execute
   val SelectSingle = QuerulousQueryClass("select_single")
   val SelectModify = QuerulousQueryClass("select_modify")
-  val SelectCopy   = QuerulousQueryClass("select_copy")
-  val SelectIntersection         = QuerulousQueryClass("select_intersection")
-  val SelectIntersectionSmall    = QuerulousQueryClass("select_intersection_small")
-  val SelectMetadata             = QuerulousQueryClass("select_metadata")
+  val SelectCopy = QuerulousQueryClass("select_copy")
+  val SelectIntersection = QuerulousQueryClass("select_intersection")
+  val SelectIntersectionSmall = QuerulousQueryClass("select_intersection_small")
+  val SelectMetadata = QuerulousQueryClass("select_metadata")
 }
 
 class SqlShardFactory(
@@ -49,11 +48,11 @@ class SqlShardFactory(
   lowLatencyQueryEvaluatorFactory: QueryEvaluatorFactory,
   materializingQueryEvaluatorFactory: QueryEvaluatorFactory,
   connection: Connection)
-extends ShardFactory[Shard] {
+  extends ShardFactory[Shard] {
 
-val deadlockRetries = 3
-    
-val PREFERENCE_TABLE_DDL = """
+  val deadlockRetries = 3
+
+  val PREFERENCE_TABLE_DDL = """
 CREATE TABLE IF NOT EXISTS %s (
 user_id BIGINT NOT NULL,
 item_id BIGINT NOT NULL,
@@ -67,14 +66,12 @@ status TINYINT NOT NULL,
 PRIMARY KEY (user_id, item_id, source,action)
 
 ) ENGINE=INNODB"""
-        
 
   def instantiate(shardInfo: ShardInfo, weight: Int) = {
     val queryEvaluator = instantiatingQueryEvaluatorFactory(connection.withHost(shardInfo.hostname))
     val lowLatencyQueryEvaluator = lowLatencyQueryEvaluatorFactory(connection.withHost(shardInfo.hostname))
     new SqlExceptionWrappingProxyFactory[Shard](shardInfo.id).apply(
-      new SqlShard(shardInfo, queryEvaluator, lowLatencyQueryEvaluator, deadlockRetries)
-    )
+      new SqlShard(shardInfo, queryEvaluator, lowLatencyQueryEvaluator, deadlockRetries))
   }
 
   //XXX: enforce readonly connection
@@ -98,24 +95,77 @@ class SqlShard(
   queryEvaluator: QueryEvaluator,
   lowLatencyQueryEvaluator: QueryEvaluator,
   deadlockRetries: Int)
-extends Shard {
+  extends Shard {
 
   private val tablePrefix = shardInfo.tablePrefix
   private val randomGenerator = new Random
 
   import QueryClass._
 
-  def get(userId: Long, itemId: Long) = {
-    lowLatencyQueryEvaluator.selectOne(SelectSingle, "SELECT * FROM " + tablePrefix + "_preference WHERE user_id = ? AND item_id = ?", userId, itemId) { row =>
+  def selectByUserItemSourceAndAction(
+    userId: Long, itemId: Long, source: String, action: String) :Option[Preference]=
+    {
+      lowLatencyQueryEvaluator.selectOne(SelectSingle, "SELECT * FROM " 
+          + tablePrefix + "_preference WHERE user_id = ? And item_id = ? AND source = ? and action = ?", userId, itemId, source, action) { row =>
+        makePreference(row)
+      }
+    }
+  def selectByUserAndSourceAndAction(userId: Long, source: String, action: String,cursor:Cursor,count:Int):(Seq[Preference],Cursor) = {
+   val prefs = new mutable.ArrayBuffer[Preference]
+	var nextCursor  = Cursor.Start
+	var retCursor = Cursor.End
+	var i=0
+	val query =   "SELECT * FROM " + tablePrefix + "_preference  Use INDEX (idx_userid_item_id) WHERE  user_id =? and source = ? and action = ? and  item_id >?  order by item_id limit ?"
+    queryEvaluator.select(SelectCopy ,query,userId,source, action,cursor.position,count+1) 
+    { row =>
+     if(i<count)
+     {
+       
+       prefs+=makePreference(row)
+       nextCursor =Cursor(row.getLong("item_id"))
+       i+1    
+     }else
+     {
+       retCursor = nextCursor;
+     }
+    }
+	(prefs,retCursor)
+  }
+
+  def selectBySourcAndAction(source: String, action: String) = {
+    lowLatencyQueryEvaluator.selectOne(SelectSingle, "SELECT * FROM " + tablePrefix + "_preference WHERE  source = ? and action = ?", source, action) { row =>
       makePreference(row)
     }
   }
-  
- def selectByUserAndSourceAndAction(userId: Long, source:String,action:String) = {
-    lowLatencyQueryEvaluator.selectOne(SelectSingle, "SELECT * FROM " + tablePrefix + "_preference WHERE user_id = ? AND source = ? and action = ?", userId, source,action) { row =>
-      makePreference(row)
+
+ def selectBySourcAndAction(source: String, action: String,cursor:(Cursor,Cursor),count:Int) 
+  	:(Seq[Preference],(Cursor,Cursor))= {
+	val prefs = new mutable.ArrayBuffer[Preference]
+	var nextCursor  = (Cursor.Start,Cursor.End)
+	var retCursor = (Cursor.End,Cursor.End)
+	var i=0
+	val query =   "SELECT * FROM " + tablePrefix + "_preference  Use INDEX (idx_userid_item_id) WHERE  source = ? and action = ? and ((user_id = ? and item_id >? ) Or (user_id> ?)) order by user_id ,item_id limit ?"
+	val (cursor1,cursor2) = cursor
+    queryEvaluator.select(SelectCopy ,query,source, action,cursor1.position,cursor2.position,cursor1.position,count+1) 
+    { row =>
+     if(i<count)
+     {
+       
+       prefs+=makePreference(row)
+       nextCursor =(Cursor(row.getLong("user_id")),Cursor(row.getLong("item_id")))
+       i+1    
+     }else
+     {
+       retCursor = nextCursor;
+     }
     }
+	(prefs,retCursor)
   }
+  def selectUserIdsBySource(source: String) =
+    {
+
+    }
+
   private def opposite(direction: String) = direction match {
     case "ASC" => "DESC"
     case "DESC" => "ASC"
@@ -123,28 +173,25 @@ extends Shard {
     case ">" => "<="
   }
 
-
   override def equals(other: Any) = {
     error("called!")
     false
   }
 
   override def hashCode = {
-    (if (tablePrefix == null) 37 else tablePrefix.hashCode * 37) + (if(queryEvaluator == null) 1 else queryEvaluator.hashCode)
+    (if (tablePrefix == null) 37 else tablePrefix.hashCode * 37) + (if (queryEvaluator == null) 1 else queryEvaluator.hashCode)
   }
 
-
-
-  private def insertPreference(transaction: Transaction,  pref: Preference): Int = {
+  private def insertPreference(transaction: Transaction, pref: Preference): Int = {
     val insertedRows =
       transaction.execute("INSERT INTO " + tablePrefix + "_preference (user_id, item_id,source" +
-    		  			  "action, created,score,status ,create_Type" +
-                          "VALUES (?, ?, ?, ?, ?, ?,?,?)",
-                          pref.userId, pref.itemId, pref.source,pref.action,pref.updatedAt.inSeconds,
-                          pref.score, pref.status.id, pref.createType.id)
-     insertedRows 
+        "action, created,score,status ,create_Type" +
+        "VALUES (?, ?, ?, ?, ?, ?,?,?)",
+        pref.userId, pref.itemId, pref.source, pref.action, pref.updatedAt.inSeconds,
+        pref.score, pref.status.id, pref.createType.id)
+    insertedRows
   }
-    
+
   def bulkUnsafeInsertPreferences(prefs: Seq[Preference]) {
     bulkUnsafeInsertPreferences(queryEvaluator, prefs)
   }
@@ -154,98 +201,94 @@ extends Shard {
       val query = "INSERT INTO " + tablePrefix + "_preference (user_id, item_id,source,action, created,score,status ,create_Type VALUES (?, ?, ?, ?, ?, ?,?,?)"
       transaction.executeBatch(query) { batch =>
         prefs.foreach { pref =>
-          batch(pref.userId, pref.itemId, pref.source,pref.action,pref.updatedAt.inSeconds,
-                          pref.score, pref.status.id, pref.createType.id)
+          batch(pref.userId, pref.itemId, pref.source, pref.action, pref.updatedAt.inSeconds,
+            pref.score, pref.status.id, pref.createType.id)
         }
       }
     }
   }
 
- private def updatePreference(transaction: Transaction, pref: Preference,
-                         oldPref: Preference): Int = {
-    if ((oldPref.updatedAtSeconds == pref.updatedAtSeconds) ) return 0
+  private def updatePreference(transaction: Transaction, pref: Preference,
+    oldPref: Preference): Int = {
+    if ((oldPref.updatedAtSeconds == pref.updatedAtSeconds)) return 0
 
+    try {
+      transaction.execute("UPDATE " + tablePrefix + "_preference SET updated_at = ?, " +
+        "score = ?, status = ?, create_type= ? " +
+        "WHERE user_id = ? AND item_id = ? AND source =  ? AND action = ?",
+        pref.updatedAt.inSeconds, pref.score, pref.status.id, pref.createType.id,
+        pref.userId, pref.itemId, pref.source, pref.action)
+    } catch {
+      case e: SQLIntegrityConstraintViolationException =>
+        // usually this is a (source_id, state, position) violation. scramble the position more.
+        // FIXME: hacky. remove with the new schema.
+        transaction.execute("UPDATE " + tablePrefix + "_preference SET updated_at = ?, " +
+          "score = ?, status = ?, create_type= ? " +
+          "WHERE user_id = ? AND item_id = ? AND source =  ? AND action = ?",
+          pref.updatedAt.inSeconds, pref.score, pref.status.id, pref.createType.id,
+          pref.userId, pref.itemId, pref.source, pref.action)
+    }
 
-      try {
-    	  transaction.execute("UPDATE " + tablePrefix + "_preference SET updated_at = ?, " +
-                              "score = ?, status = ?, create_type= ? " +
-                              "WHERE user_id = ? AND item_id = ? AND source =  ? AND action = ?",
-                              pref.updatedAt.inSeconds,pref.score, pref.status.id, pref.createType.id,
-                              pref.userId, pref.itemId, pref.source,pref.action)
-      } catch {
-        case e: SQLIntegrityConstraintViolationException =>
-          // usually this is a (source_id, state, position) violation. scramble the position more.
-          // FIXME: hacky. remove with the new schema.
-          transaction.execute("UPDATE " + tablePrefix + "_preference SET updated_at = ?, " +
-                              "score = ?, status = ?, create_type= ? " +
-                              "WHERE user_id = ? AND item_id = ? AND source =  ? AND action = ?",
-                              pref.updatedAt.inSeconds,pref.score, pref.status.id, pref.createType.id,
-                              pref.userId, pref.itemId, pref.source,pref.action)
-      }
-    
     0
   }
- 
-
 
   // returns +1, 0, or -1, depending on how the metadata count should change after this operation.
   // `predictExistence`=true for normal operations, false for copy/migrate.
 
   private def writePreference(transaction: Transaction, pref: Preference,
-                        predictExistence: Boolean): Int = {
+    predictExistence: Boolean): Int = {
     val countDelta = if (predictExistence) {
       transaction.selectOne(SelectModify,
-                            "SELECT * FROM " + tablePrefix + "_preferences WHERE user_id = ? " +
-                            "and item_id = ? and source = ? and action = ?", pref.userId, pref.itemId,pref.source,pref.action) { row =>
-        makePreference(row)
-      }.map { oldRow =>
-        updatePreference(transaction, pref, oldRow)
-      }.getOrElse {
-        insertPreference(transaction, pref)
-      }
+        "SELECT * FROM " + tablePrefix + "_preferences WHERE user_id = ? " +
+          "and item_id = ? and source = ? and action = ?", pref.userId, pref.itemId, pref.source, pref.action) { row =>
+          makePreference(row)
+        }.map { oldRow =>
+          updatePreference(transaction, pref, oldRow)
+        }.getOrElse {
+          insertPreference(transaction, pref)
+        }
     } else {
       try {
         insertPreference(transaction, pref)
       } catch {
         case e: SQLIntegrityConstraintViolationException =>
           transaction.selectOne(SelectModify,
-                            "SELECT * FROM " + tablePrefix + "_preferences WHERE user_id = ? " +
-                            "and item_id = ? and source = ? and action = ?", pref.userId, pref.itemId,pref.source,pref.action) { row =>
-            makePreference(row)
-          }.map { oldRow =>
-            updatePreference(transaction, pref, oldRow)
-          }.getOrElse(0)
+            "SELECT * FROM " + tablePrefix + "_preferences WHERE user_id = ? " +
+              "and item_id = ? and source = ? and action = ?", pref.userId, pref.itemId, pref.source, pref.action) { row =>
+              makePreference(row)
+            }.map { oldRow =>
+              updatePreference(transaction, pref, oldRow)
+            }.getOrElse(0)
       }
     }
-    countDelta 
+    countDelta
   }
 
-  private def write(transaction:Transaction,pref: Preference) {
-    write(transaction,pref, deadlockRetries, true)
+  private def write(transaction: Transaction, pref: Preference) {
+    write(transaction, pref, deadlockRetries, true)
   }
 
-  private def write(transaction:Transaction,pref: Preference, tries: Int, predictExistence: Boolean) {
+  private def write(transaction: Transaction, pref: Preference, tries: Int, predictExistence: Boolean) {
     try {
-      
-        val countDelta = writePreference(transaction,  pref, predictExistence)
-     
+
+      val countDelta = writePreference(transaction, pref, predictExistence)
+
     } catch {
       case e: MySQLTransactionRollbackException if (tries > 0) =>
-        write(transaction,pref, tries - 1, predictExistence)
+        write(transaction, pref, tries - 1, predictExistence)
       case e: SQLIntegrityConstraintViolationException if (tries > 0) =>
         // temporary. until the position differential between master/slave is fixed, it's
         // possible for a slave migration to have two different edges with the same position.
-        write(transaction,new Preference(pref.userId, pref.itemId, pref.source,pref.action,pref.updatedAt,
-                          pref.score, pref.status, pref.createType), tries - 1, predictExistence)
+        write(transaction, new Preference(pref.userId, pref.itemId, pref.source, pref.action, pref.updatedAt,
+          pref.score, pref.status, pref.createType), tries - 1, predictExistence)
     }
   }
 
   /**
-* Mysql may throw an exception for a bulk operation that actually partially completed.
-* If that happens, try to pick up the pieces and indicate what happened.
-*/
+   * Mysql may throw an exception for a bulk operation that actually partially completed.
+   * If that happens, try to pick up the pieces and indicate what happened.
+   */
   case class BurstResult(completed: Seq[Preference], failed: Seq[Preference])
-
 
   def writeBurst(transaction: Transaction, preferences: Seq[Preference]): BurstResult = {
     try {
@@ -255,19 +298,19 @@ extends Shard {
       case e: BatchUpdateException =>
         val completed = new mutable.ArrayBuffer[Preference]
         val failed = new mutable.ArrayBuffer[Preference]
-        e.getUpdateCounts.zip(preferences).foreach { case (errorCode, edge) =>
-          if (errorCode < 0) {
-            failed += edge
-          } else {
-            completed += edge
-          }
+        e.getUpdateCounts.zip(preferences).foreach {
+          case (errorCode, edge) =>
+            if (errorCode < 0) {
+              failed += edge
+            } else {
+              completed += edge
+            }
         }
         BurstResult(completed, failed)
     }
   }
 
-
-  def writeCopies(transaction:Transaction,preferences: Seq[Preference]) {
+  def writeCopies(transaction: Transaction, preferences: Seq[Preference]) {
     if (!preferences.isEmpty) {
       Stats.addMetric("copy-burst", preferences.size)
 
@@ -275,54 +318,51 @@ extends Shard {
       preferences.foreach { preference => userIdsSet += preference.userId }
       val userIds = userIdsSet.toSeq
 
-    
-        val result = writeBurst(transaction,preferences)
-        if (result.completed.size > 0) {
-          var currentSourceId = -1L
-          var countDeltas = new Array[Int](4)
-          result.completed.foreach { preference =>
-            if (preference.userId != currentSourceId) {
-              if (currentSourceId != -1)
-                //updateCount(transaction, currentSourceId, countDeltas(metadataById(currentSourceId).state.id))
+      val result = writeBurst(transaction, preferences)
+      if (result.completed.size > 0) {
+        var currentSourceId = -1L
+        var countDeltas = new Array[Int](4)
+        result.completed.foreach { preference =>
+          if (preference.userId != currentSourceId) {
+            if (currentSourceId != -1)
+              //updateCount(transaction, currentSourceId, countDeltas(metadataById(currentSourceId).state.id))
               currentSourceId = preference.userId
-              countDeltas = new Array[Int](4)
-            }
-            countDeltas(preference.status.id) += 1
+            countDeltas = new Array[Int](4)
           }
-         // updateCount(transaction, currentSourceId,countDeltas(metadataById(currentSourceId).state.id))
+          countDeltas(preference.status.id) += 1
         }
+        // updateCount(transaction, currentSourceId,countDeltas(metadataById(currentSourceId).state.id))
+      }
 
-        if (result.failed.size > 0) {
-          Stats.incr("copy-fallback")
-          var currentSourceId = -1L
-          var countDelta = 0
-          result.failed.foreach { preference =>
-            if (preference.userId != currentSourceId) {
-              if (currentSourceId != -1)
-                //updateCount(transaction, currentSourceId, countDelta)
+      if (result.failed.size > 0) {
+        Stats.incr("copy-fallback")
+        var currentSourceId = -1L
+        var countDelta = 0
+        result.failed.foreach { preference =>
+          if (preference.userId != currentSourceId) {
+            if (currentSourceId != -1)
+              //updateCount(transaction, currentSourceId, countDelta)
               currentSourceId = preference.userId
-              countDelta = 0
-            }
-            countDelta += writePreference(transaction,  preference, false)
+            countDelta = 0
           }
-          //updateCount(transaction, currentSourceId, countDelta)
+          countDelta += writePreference(transaction, preference, false)
         }
-      
+        //updateCount(transaction, currentSourceId, countDelta)
+      }
+
     }
   }
 
-
-
-  private def makePreference(userId: Long, itemId: Long, source: String, action: String, 
-      updatedAt: Time, score: Double,status: Status, createType: CreateType): Preference = {
+  private def makePreference(userId: Long, itemId: Long, source: String, action: String,
+    updatedAt: Time, score: Double, status: Status, createType: CreateType): Preference = {
     new Preference(userId, itemId, source, action, updatedAt.inSeconds, score, status, createType)
   }
 
   private def makePreference(row: ResultSet): Preference = {
-    makePreference(row.getLong("user_id"), row.getLong("item_id"), 
-      row.getString("source"), row.getString("action"),Time.fromSeconds(row.getInt("updated_at")), 
-      row.getDouble("score"), Status(row.getInt("status")),CreateType(row.getInt("createType")))
+    makePreference(row.getLong("user_id"), row.getLong("item_id"),
+      row.getString("source"), row.getString("action"), Time.fromSeconds(row.getInt("updated_at")),
+      row.getDouble("score"), Status(row.getInt("status")), CreateType(row.getInt("createType")))
   }
-  
+
 }
 

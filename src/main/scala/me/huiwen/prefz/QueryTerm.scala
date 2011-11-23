@@ -17,5 +17,4 @@
 package me.huiwen.prefz
 
 
-case class QueryTerm(sourceId: Long, graphId: Int, isForward: Boolean,
-                     destinationIds: Option[Seq[Long]], var states: Seq[State])
+case class QueryTerm(userId: Long, graphId: Int,itemId:Long,source:String,action:String)
