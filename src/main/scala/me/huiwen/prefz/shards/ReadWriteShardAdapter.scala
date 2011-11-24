@@ -27,16 +27,52 @@ class ReadWriteShardAdapter(shard: RoutingNode[Shard])
 
   
 
-  def bulkUnsafeInsertPreferences(prefs: Seq[Preference]) = shard.writeOperation(_.bulkUnsafeInsertPreferences(prefs))
+  def bulkUnsafeInsertPreferences(prefs: Seq[Preference]) 
+  	= shard.writeOperation(_.bulkUnsafeInsertPreferences(prefs))
 
-  def writeCopies(edges: Seq[Preference]) = shard.writeOperation(_.writeCopies(edges))
+  def writeCopies(edges: Seq[Preference]) 
+  	= shard.writeOperation(_.writeCopies(edges))
 
-  def add(userId: Long, itemId: Long, source: String, action: String, updatedAt: Time, score: Double,
-    status: Status, createType: CreateType) = shard.writeOperation(_.add(userId, itemId, source, action, updatedAt, score, status, createType))
+  def add(userId: Long, itemId: Long, source: String, action: String, score: Double,createdTime: Time, status: Status, createType: CreateType) 
+  	= shard.writeOperation(_.add(userId,itemId,source,action,score,createdTime,status,createType))
 
-  def update(userId: Long, itemId: Long, source: String, action: String, updatedAt: Time, score: Double,
-    status: Status, createType: CreateType) = shard.writeOperation(_.update(userId, itemId, source, action, updatedAt, score, status, createType))
 
-  def delete(userId: Long, itemId: Long, source: String, action: String) = shard.writeOperation(_.delete(userId, itemId, source, action))
+  def add(pref: Preference) 
+  	= shard.writeOperation(_.add(pref))
+
+  def delete(userId: Long, itemId: Long, source: String, action: String)
+  	=shard.writeOperation(_.delete(userId,itemId,source,action))
+
+  def delete(pref: Preference)
+  	=shard.writeOperation(_.delete(pref))
+  	
+  def update(userId: Long, itemId: Long, source: String, action: String,  score: Double,createdTime: Time,status: Status, createType: CreateType)
+  	= shard.writeOperation(_.update(userId,itemId,source,action,score,createdTime,status,createType))
+  def update(pref: Preference)
+  = shard.writeOperation(_.update(pref))
+  
+  def selectByUserItemSourceAndAction(userId: Long, itemId: Long, source: String, action: String) 
+  	=shard.readOperation(_.selectByUserItemSourceAndAction(userId,itemId,source,action))
+  
+  def selectByUserSourceAndAction(userId: Long, source: String, action: String)
+  	=shard.readOperation(_.selectByUserSourceAndAction(userId,source,action))
+  	
+  def selectByUserAndSourceAndAction(userId: Long, source: String, action: String, cursor: Cursor, count: Int): (Seq[Preference], Cursor)
+  	=shard.readOperation(_.selectByUserAndSourceAndAction(userId,source,action,cursor,count))
+  	
+  def selectBySourcAndAction(source: String, action: String)
+  	=shard.readOperation(_.selectBySourcAndAction(source,action))
+  	
+  def selectBySourcAndAction(source: String, action: String, cursor: (Cursor, Cursor), count: Int)
+   =shard.readOperation(_.selectBySourcAndAction(source,action,cursor,count))
+
+ def selectUserIdsBySource(source: String)
+  =shard.readOperation(_.selectUserIdsBySource(source))
+
+
+  
+  
+
+
 }
 

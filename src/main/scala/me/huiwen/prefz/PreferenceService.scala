@@ -25,7 +25,8 @@ import com.twitter.gizzard.thrift.conversions.Sequences._
 import operations.{ExecuteOperations, SelectOperation}
 import com.twitter.logging.Logger
 import queries._
-import thrift.PrefzException
+import thrift.PrefException
+import com.twitter.util.Time
 
 class PreferenceService(
   forwardingManager: ForwardingManager,
@@ -41,80 +42,108 @@ class PreferenceService(
     future.shutdown()
   }
 
-  def contains(userId: Long, graphId: Int, itemId: Long): Boolean = {
-    rethrowExceptionsAsThrift {
-      Stats.transaction.name = "contains"
-      forwardingManager.find(userId, graphId).get(userId, itemId).map { pref =>
-        pref.status== Status.VALID
-      }.getOrElse(false)
-    }
-  }
-
-  def get(userId: Long, graphId: Int, itemId: Long): Preference = {
-    rethrowExceptionsAsThrift {
-      Stats.transaction.name = "get"
-      forwardingManager.find(userId, graphId).get(userId, itemId).getOrElse {
-        throw new PrefzException("Record not found: (%d, %d, %d)".format(userId, graphId, itemId))
+    def create(graphId:Int,userId: Long, itemId: Long, source: String, action: String, createdTime: Int, score: Double,
+    status: Status, createType: CreateType)
+    {
+      rethrowExceptionsAsThrift
+      {
+        val shard = forwardingManager.find(userId, graphId)
+        shard.add(userId,itemId,source,action,score,Time(createdTime),status,createType);
       }
     }
-  }
 
-  def select(query: SelectQuery): ResultWindow[Long] = select(List(query)).head
-
-  def select(queries: Seq[SelectQuery]): Seq[ResultWindow[Long]] = {
-    rethrowExceptionsAsThrift {
-      queries.parallel(future).map { query =>
-        try {
-          val queryTree = selectCompiler(query.operations)
-          val rv = queryTree.select(query.page)
-          Stats.transaction.record(queryTree.toString)
-          rv
-        } catch {
-          case e: ShardBlackHoleException =>
-            throw new PrefzException("Shard is blackholed: " + e)
-        }
+    def create(graphId:Int,pref: Preference)
+    {
+       rethrowExceptionsAsThrift
+      {
+        val shard = forwardingManager.find(pref.userId, graphId)
+        shard.add(pref);
       }
     }
-  }
 
-  def selectEdges(queries: Seq[EdgeQuery]): Seq[ResultWindow[Edge]] = {
-    rethrowExceptionsAsThrift {
-      queries.parallel(future).map { query =>
-        val term = query.term
-        val shard = forwardingManager.find(term.sourceId, term.graphId, Direction(term.isForward))
-        val states = if (term.states.isEmpty) List(State.Normal) else term.states
 
-        if (term.destinationIds.isDefined) {
-          val results = shard.intersectEdges(term.sourceId, states, term.destinationIds.get)
-          new ResultWindow(results.map { edge => (edge, Cursor(edge.destinationId)) }, query.page.count, query.page.cursor)
-        } else {
-          shard.selectEdges(term.sourceId, states, query.page.count, query.page.cursor)
-        }
+    def delete(graphId:Int,userId: Long, itemId: Long, source: String, action: String)
+    {
+       rethrowExceptionsAsThrift
+      {
+        val shard = forwardingManager.find(userId, graphId)
+        shard.delete(userId,itemId,source,action)
       }
     }
-  }
 
-  def execute(operations: ExecuteOperations) {
-    rethrowExceptionsAsThrift {
-      Stats.transaction.name = "execute"
-      executeCompiler(operations)
-    }
-  }
-
-  def count(queries: Seq[Seq[SelectOperation]]): Seq[Int] = {
-    rethrowExceptionsAsThrift {
-      queries.parallel(future).map { query =>
-        val queryTree = selectCompiler(query)
-        val rv = queryTree.sizeEstimate
-        Stats.transaction.record(queryTree.toString)
-        rv
+    def delete(graphId:Int,pref: Preference)
+    {
+       rethrowExceptionsAsThrift
+       {
+        val shard = forwardingManager.find(pref.userId, graphId)
+        shard.delete(pref);
       }
     }
+    
+   def update(graphId:Int,userId: Long, itemId: Long, source: String, action: String, updatedAt: Time, score: Double,
+    status: Status, createType: CreateType)
+   {
+      rethrowExceptionsAsThrift
+      {
+        val shard = forwardingManager.find(userId, graphId)
+        shard.add(userId,itemId,source,action,score,updatedAt,status,createType);
+      }
+      
+   }
+
+  def update(graphId:Int,pref: Preference)
+  {
+           rethrowExceptionsAsThrift
+       {
+        val shard = forwardingManager.find(pref.userId, graphId)
+        shard.update(pref);
+      }
   }
+
+  def selectByUserItemSourceAndAction(graphId:Int,userId: Long, itemId: Long, source: String, action: String)
+  {
+     rethrowExceptionsAsThrift {
+        val shard = forwardingManager.find(userId, graphId)
+        shard.selectByUserItemSourceAndAction(userId,itemId,source,action)     
+    }   
+  }
+  def selectByUserSourceAndAction(userId: Long, source: String, action: String)
+  {
+    
+  }
+  def selectByUserAndSourceAndAction(graphId:Int,userId: Long, source: String, action: String, cursor: Cursor, count: Int)
+  {
+     rethrowExceptionsAsThrift {
+        val shard = forwardingManager.find(userId, graphId)
+        shard.selectByUserAndSourceAndAction(userId,source,action,cursor,count)     
+    }   
+  }
+  
+   def selectBySourcAndAction(source: String, action: String)
+   {
+     
+     
+   }
+  def selectBySourcAndAction(graphId:Int,source: String, action: String, cursor: (Cursor, Cursor), count: Int)
+  {
+       rethrowExceptionsAsThrift {
+        val shard = forwardingManager.find(0, graphId)
+        shard.selectBySourcAndAction(source,action,cursor,count)     
+    }  
+    
+  }
+  
+
+ def selectUserIdsBySource(source: String)
+ {
+  
+ }
+  
+
 
   private def countAndRethrow(e: Throwable) = {
     Stats.incr("exceptions-" + e.getClass.getName.split("\\.").last)
-    throw(new PrefzException(e.getMessage))
+    throw(new PrefException(e.getMessage))
   }
 
   private def rethrowExceptionsAsThrift[A](block: => A): A = {
@@ -123,11 +152,11 @@ class PreferenceService(
     } catch {
       case e: NonExistentShard =>
         log.error(e, "NonexistentShard: %s", e)
-        throw(new PrefzException(e.getMessage))
+        throw(new PrefException(e.getMessage))
       case e: InvalidShard =>
         log.error(e, "NonexistentShard: %s", e)
-        throw(new PrefzException(e.getMessage))
-      case e: PrefzException =>
+        throw(new PrefException(e.getMessage))
+      case e: PrefException =>
         Stats.incr(e.getClass.getName)
         throw(e)
       case e: ShardTimeoutException =>
@@ -138,9 +167,9 @@ class PreferenceService(
         countAndRethrow(e)
       case e: Throwable =>
         Stats.incr("exceptions-unknown")
-        exceptionLog.error(e, "Unhandled error in EdgesService", e)
-        log.error("Unhandled error in EdgesService: " + e.toString)
-        throw(new PrefzException(e.toString))
+        exceptionLog.error(e, "Unhandled error in PreferenceService", e)
+        log.error("Unhandled error in PreferenceService: " + e.toString)
+        throw(new PrefException(e.toString))
     }
   }
 }

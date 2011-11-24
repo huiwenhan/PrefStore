@@ -31,7 +31,7 @@ trait Shard {
 
   @throws(classOf[shards.ShardException]) def bulkUnsafeInsertPreferences(Preference: Seq[Preference])
 
-  @throws(classOf[shards.ShardException]) def add(userId: Long, itemId: Long, source: String, action: String, updatedAt: Time, score: Double,
+  @throws(classOf[shards.ShardException]) def add(userId: Long, itemId: Long, source: String, action: String, score: Double,updatedAt: Time, 
     status: Status, createType: CreateType)
 
   @throws(classOf[shards.ShardException]) def add(pref: Preference)
@@ -53,7 +53,7 @@ trait Shard {
 
   @throws(classOf[shards.ShardException]) def selectUserIdsBySource(source: String)
 
-  @throws(classOf[shards.ShardException]) def update(userId: Long, itemId: Long, source: String, action: String, updatedAt: Time, score: Double,
+  @throws(classOf[shards.ShardException]) def update(userId: Long, itemId: Long, source: String, action: String,  score: Double,updatedAt: Time,
     status: Status, createType: CreateType)
 
   @throws(classOf[shards.ShardException]) def update(pref: Preference)
