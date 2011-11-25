@@ -41,10 +41,10 @@ trait Shard {
   @throws(classOf[shards.ShardException]) def delete(pref: Preference)
 
   @throws(classOf[shards.ShardException]) def selectByUserItemSourceAndAction(
-    userId: Long, itemId: Long, source: String, action: String)
+    userId: Long, itemId: Long, source: String, action: String):Option[Preference]
   
-  @throws(classOf[shards.ShardException]) def selectByUserSourceAndAction(userId: Long, source: String, action: String)
-  @throws(classOf[shards.ShardException]) def selectByUserAndSourceAndAction(userId: Long, source: String, action: String, cursor: Cursor, count: Int): (Seq[Preference], Cursor)
+  @throws(classOf[shards.ShardException]) def selectByUserSourceAndAction(userId: Long, source: String, action: String): List[Preference]
+  @throws(classOf[shards.ShardException]) def selectPageByUserSourceAndAction(userId: Long, source: String, action: String, cursor: Cursor, count: Int): (Seq[Preference], Cursor)
   
   @throws(classOf[shards.ShardException]) def selectBySourcAndAction(
     source: String, action: String)
@@ -52,6 +52,10 @@ trait Shard {
   
 
   @throws(classOf[shards.ShardException]) def selectUserIdsBySource(source: String)
+  
+  @throws(classOf[shards.ShardException]) def selectByUser(userId: Long):ResultWindow[Preference]
+   
+  @throws(classOf[shards.ShardException]) def selectByUser(userId: Long, cursor: Cursor, count: Int)
 
   @throws(classOf[shards.ShardException]) def update(userId: Long, itemId: Long, source: String, action: String,  score: Double,updatedAt: Time,
     status: Status, createType: CreateType)

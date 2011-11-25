@@ -110,7 +110,7 @@ class SqlShard(
         makePreference(row)
       }
     }
-  def selectByUserAndSourceAndAction(userId: Long, source: String, action: String,cursor:Cursor,count:Int):(Seq[Preference],Cursor) = {
+  def selectByUserSourceAndAction(userId: Long, source: String, action: String,cursor:Cursor,count:Int):(Seq[Preference],Cursor) = {
    val prefs = new mutable.ArrayBuffer[Preference]
 	var nextCursor  = Cursor.Start
 	var retCursor = Cursor.End
@@ -166,6 +166,19 @@ class SqlShard(
 
     }
 
+  def selectByUser(userId: Long, cursor: Cursor, count: Int):ResultWindow[Preference]=
+  {
+    val prefs = new mutable.ArrayBuffer[(Preference,Cursor)]
+	val query =   "SELECT * FROM " + tablePrefix + "_preference  Use INDEX (idx_userid_item_id) WHERE  user_id =?  and  item_id >?  order by item_id limit ?"
+    queryEvaluator.select(SelectCopy ,query,userId,cursor.position,count+1) 
+    { row =>  
+       prefs+=(makePreference(row)->Cursor(row.getLong("item_id")))
+    }
+    var page=prefs.view
+    if(cursor< Cursor.Start) page=page.reverse
+	new ResultWindow(page,count,cursor)
+  }
+  
   private def opposite(direction: String) = direction match {
     case "ASC" => "DESC"
     case "DESC" => "ASC"

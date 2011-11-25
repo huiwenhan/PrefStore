@@ -17,24 +17,24 @@
 package me.huiwen.prefz
 
 import com.twitter.util.Duration
+import com.twitter.util.Time
 import com.twitter.ostrich.admin.Service
 import com.twitter.querulous.StatsCollector
 import com.twitter.gizzard.GizzardServer
 import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.proxy.ExceptionHandlingProxyFactory
 import com.twitter.gizzard.Stats
-import me.huiwen.prefz.shards.{Shard, SqlShardFactory}
-import me.huiwen.prefz.config.{PrefStore => PrefStoreConfig}
-
+import me.huiwen.prefz.shards.{ Shard, SqlShardFactory }
+import me.huiwen.prefz.config.{ PrefStore => PrefStoreConfig }
 
 class PrefStore(config: PrefStoreConfig) extends GizzardServer(config) with Service {
   object PrefzExceptionWrappingProxyFactory extends ExceptionHandlingProxyFactory[thrift.PreferenceService.Iface]({ (flock, e) =>
     e match {
-      case _: thrift.PrefzException =>
+      case _: thrift.PrefException =>
         throw e
       case _ =>
         exceptionLog.error(e, "Error in PrefStore.")
-        throw new thrift.PrefzException(e.toString)
+        throw new thrift.PrefException(e.toString)
     }
   })
 
@@ -55,43 +55,36 @@ class PrefStore(config: PrefStoreConfig) extends GizzardServer(config) with Serv
     config.edgesQueryEvaluator(
       stats,
       new TransactionStatsCollectingDatabaseFactory(_),
-      new TransactionStatsCollectingQueryFactory(_)
-    ),
+      new TransactionStatsCollectingQueryFactory(_)),
     config.lowLatencyQueryEvaluator(
       stats,
       new TransactionStatsCollectingDatabaseFactory(_),
-      new TransactionStatsCollectingQueryFactory(_)
-    ),
+      new TransactionStatsCollectingQueryFactory(_)),
     config.materializingQueryEvaluator(stats),
-    config.databaseConnection
-  )
+    config.databaseConnection)
 
   nameServer.configureMultiForwarder[Shard] {
     _.shardFactories(
       "com.twitter.flockdb.SqlShard" -> shardFactory,
-      "com.twitter.service.flock.edges.SqlShard" -> shardFactory
-    )
-    .copyFactory(new jobs.CopyFactory(nameServer, jobScheduler(Priority.Medium.id)))
+      "com.twitter.service.flock.edges.SqlShard" -> shardFactory)
+      .copyFactory(new jobs.CopyFactory(nameServer, jobScheduler(Priority.Medium.id)))
   }
 
   val forwardingManager = new ForwardingManager(nameServer.multiTableForwarder[Shard])
 
   jobCodec += ("single.Single".r, new jobs.single.SingleJobParser(forwardingManager, OrderedUuidGenerator))
-  jobCodec += ("multi.Multi".r,   new jobs.multi.MultiJobParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
+  jobCodec += ("multi.Multi".r, new jobs.multi.MultiJobParser(forwardingManager, jobScheduler, config.aggregateJobsPageSize))
 
-  jobCodec += ("jobs\\.(Copy|Migrate)".r,                 new jobs.CopyParser(nameServer, jobScheduler(Priority.Medium.id)))
-  jobCodec += ("jobs\\.(MetadataCopy|MetadataMigrate)".r, new jobs.MetadataCopyParser(nameServer, jobScheduler(Priority.Medium.id)))
+  jobCodec += ("jobs\\.(Copy|Migrate)".r, new jobs.CopyParser(nameServer, jobScheduler(Priority.Medium.id)))
 
- 
   val flockService = {
-    val edges = new PreferenceService(
+    val prefs = new PreferenceService(
       forwardingManager,
       jobScheduler,
       config.readFuture("readFuture"),
-      config.aggregateJobsPageSize
-    )
+      config.aggregateJobsPageSize)
 
-    new PrefDBThriftAdapter(edges, jobScheduler)
+    new PrefStoreThriftAdapter(prefs, jobScheduler)
   }
 
   private val loggingProxy = makeLoggingProxy[thrift.PreferenceService.Iface]()
@@ -124,52 +117,66 @@ class PrefStore(config: PrefStoreConfig) extends GizzardServer(config) with Serv
   }
 }
 
-class PrefStoreThriftAdapter(val prefs: PreferenceService, val scheduler: PrioritizingJobScheduler) extends thrift.PreferenceService.Iface {
-  import java.util.{List => JList}
+class PrefStoreThriftAdapter(val prefz: PreferenceService, val scheduler: PrioritizingJobScheduler) extends thrift.PreferenceService.Iface {
+  import java.util.{ List => JList }
   import scala.collection.JavaConversions._
   import com.twitter.gizzard.thrift.conversions.Sequences._
   import me.huiwen.prefz.conversions.Preference._
   import me.huiwen.prefz.conversions.Page._
   import me.huiwen.prefz.conversions.Results._
   import com.twitter.gizzard.shards.ShardException
-  import thrift.PrefzException
+  import thrift.PrefException
 
-  def contains(source_id: Long, graph_id: Int, destination_id: Long) = {
-    prefs.contains(source_id, graph_id, destination_id)
+  def create(graphId: Int, userId: Long, itemId: Long, source: String, action: String, createDate: Int, score: Double,
+    status: Status, createType: CreateType) {
+    prefz.create(graphId, userId, itemId, source, action, score, createDate, status, createType);
   }
 
-  def get(source_id: Long, graph_id: Int, destination_id: Long) = {
-    prefs.get(source_id, graph_id, destination_id).toThrift
+  def create(graphId: Int, pref: thrift.Preference) {
+    prefz.create(graphId, pref.fromThrift);
   }
 
-  @deprecated("Use `select2` instead")
-  def select(operations: JList[thrift.SelectOperation], page: thrift.Page): thrift.Results = {
-    prefs.select(new SelectQuery(operations.toSeq.map { _.fromThrift }, page.fromThrift)).toThrift
+  def delete(graphId: Int, userId: Long, itemId: Long, source: String, action: String) {
+    prefz.delete(graphId, userId, itemId, source, action);
   }
 
-  def select2(queries: JList[thrift.SelectQuery]): JList[thrift.Results] = {
-    prefs.select(queries.toSeq.map { _.fromThrift }).map { _.toThrift }
+  def delete(graphId: Int, pref: thrift.Preference) {
+    prefz.delete(graphId, pref.fromThrift);
   }
 
-  def select_edges(queries: JList[thrift.EdgeQuery]) = {
-    prefs.selectEdges(queries.toSeq.map { _.fromThrift }).map { _.toEdgeResults }
+  def update(graphId: Int, userId: Long, itemId: Long, source: String, action: String, score: Double, createDateInSeconds: Int,
+    status: Status, createType: CreateType) {
+    prefz.update(graphId, userId, itemId, source, action, score, Time(createDateInSeconds), status, createType);
+
   }
 
-  def execute(operations: thrift.ExecuteOperations) = {
-    try {
-      prefs.execute(operations.fromThrift)
-    } catch {
-      case e: ShardException =>
-        throw new PrefzException(e.toString)
+  def update(graphId: Int, pref: thrift.Preference) {
+    prefz.update(graphId, pref.fromThrift);
+  }
+
+  def selectByUserItemSourceAndAction(graphId: Int, userId: Long, itemId: Long, source: String, action: String) {
+    prefz.selectByUserItemSourceAndAction(graphId, userId, itemId, source, action).getOrElse {
+      null
     }
   }
-
-  @deprecated("Use `count2` instead")
-  def count(query: JList[thrift.SelectOperation]) = {
-    edges.count(List(query.toSeq.map { _.fromThrift })).first
+  def selectByUserSourceAndAction(userId: Long, source: String, action: String) {
+    prefz.selectByUserSourceAndAction(userId, source, action)
+  }
+  def selectPageByUserSourceAndAction(graphId: Int, userId: Long, source: String, action: String, cursor: Cursor, count: Int) {
+    prefz.selectPageByUserSourceAndAction(graphId, userId, source, action, cursor, count)
   }
 
-  def count2(queries: JList[JList[thrift.SelectOperation]]) = {
-    edges.count(queries.toSeq.map { _.toSeq.map { _.fromThrift }}).pack
+  def selectBySourcAndAction(source: String, action: String) {
+    prefz.selectBySourcAndAction(source, action)
+
   }
+  def selectBySourcAndAction(graphId: Int, source: String, action: String, cursor: (Cursor, Cursor), count: Int) {
+    prefz.selectBySourcAndAction(graphId, source, action, cursor, count)
+
+  }
+
+  def selectUserIdsBySource(source: String) {
+    prefz.selectUserIdsBySource(source)
+  }
+
 }

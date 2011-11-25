@@ -22,9 +22,7 @@ import com.twitter.gizzard.scheduler.{CopyJobFactory, JsonJob, PrioritizingJobSc
 import com.twitter.gizzard.shards.{ShardBlackHoleException, ShardDatabaseTimeoutException,
   ShardOfflineException, ShardTimeoutException}
 import com.twitter.gizzard.thrift.conversions.Sequences._
-import operations.{ExecuteOperations, SelectOperation}
 import com.twitter.logging.Logger
-import queries._
 import thrift.PrefException
 import com.twitter.util.Time
 
@@ -42,7 +40,7 @@ class PreferenceService(
     future.shutdown()
   }
 
-    def create(graphId:Int,userId: Long, itemId: Long, source: String, action: String, createdTime: Int, score: Double,
+    def create(graphId:Int,userId: Long, itemId: Long, source: String, action: String,  score: Double,createdTime: Int,
     status: Status, createType: CreateType)
     {
       rethrowExceptionsAsThrift
@@ -80,7 +78,7 @@ class PreferenceService(
       }
     }
     
-   def update(graphId:Int,userId: Long, itemId: Long, source: String, action: String, updatedAt: Time, score: Double,
+   def update(graphId:Int,userId: Long, itemId: Long, source: String, action: String, score: Double,updatedAt: Time, 
     status: Status, createType: CreateType)
    {
       rethrowExceptionsAsThrift
@@ -100,7 +98,7 @@ class PreferenceService(
       }
   }
 
-  def selectByUserItemSourceAndAction(graphId:Int,userId: Long, itemId: Long, source: String, action: String)
+  def selectByUserItemSourceAndAction(graphId:Int,userId: Long, itemId: Long, source: String, action: String):Option[Preference] = 
   {
      rethrowExceptionsAsThrift {
         val shard = forwardingManager.find(userId, graphId)
@@ -111,11 +109,11 @@ class PreferenceService(
   {
     
   }
-  def selectByUserAndSourceAndAction(graphId:Int,userId: Long, source: String, action: String, cursor: Cursor, count: Int)
+  def selectPageByUserSourceAndAction(graphId:Int,userId: Long, source: String, action: String, cursor: Cursor, count: Int)
   {
      rethrowExceptionsAsThrift {
         val shard = forwardingManager.find(userId, graphId)
-        shard.selectByUserAndSourceAndAction(userId,source,action,cursor,count)     
+        shard.selectPageByUserSourceAndAction(userId,source,action,cursor,count)     
     }   
   }
   

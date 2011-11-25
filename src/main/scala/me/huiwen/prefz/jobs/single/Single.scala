@@ -24,11 +24,10 @@ import com.twitter.conversions.time._
 import me.huiwen.prefz.Status
 import me.huiwen.prefz
 import me.huiwen.prefz.ForwardingManager
-import me.huiwen.prefz.CreateType 
+import me.huiwen.prefz.CreateType
 import me.huiwen.prefz.UuidGenerator
 import me.huiwen.prefz.conversions.Numeric._
 import me.huiwen.prefz.shards.Shard
-import me.huiwen.prefz.shards.LockingNodeSet._
 
 class SingleJobParser(
   forwardingManager: ForwardingManager,
@@ -52,33 +51,31 @@ class SingleJobParser(
     val casted = attributes.asInstanceOf[Map[String, AnyVal]]
 
     new Single(
+      casted("graph_id").toInt,
       casted("user_id").toLong,
       casted("item_id").toLong,
       casted("source").toString(),
       casted("action").toString(),
       casted("score").toDouble,
+      Time.fromSeconds(casted("create_date").toInt),
       Status(casted("status").toInt),
-      CreateType(casted("create_type").toInt),
-      Time.fromSeconds(casted("updated_at").toInt),
-      casted("graph_id").toInt,
+      CreateType(casted("create_type").toInt),   
       forwardingManager,
-      uuidGenerator,
       writeSuccesses.toList)
   }
 }
 
 class Single(
+  graphId: Int,
   userId: Long,
   itemId: Long,
   source: String,
   action: String,
   score: Double,
+    createDate: Time,
   status: Status,
   createType: CreateType,
-  updatedAt: Time,
-  graphId: Int,
   forwardingManager: ForwardingManager,
-  uuidGenerator: UuidGenerator,
   var successes: List[ShardId] = Nil)
   extends JsonJob {
 
@@ -91,7 +88,7 @@ class Single(
       "score" -> score,
       "status" -> status.id,
       "create_type" -> createType.id,
-      "updated_at" -> updatedAt.inSeconds,
+      "create_date" -> createDate.inSeconds,
       "graph_id" -> graphId)
 
     if (successes.isEmpty) {
@@ -103,21 +100,16 @@ class Single(
 
   def apply() = {
     val forward = forwardingManager.findNode(userId, graphId).write
-    //val uuid = uuidGenerator(position)
 
     var currSuccesses: List[ShardId] = Nil
     var currErrs: List[Throwable] = Nil
 
-    forward.optimistically(userId) { left =>
-
-        val forwardResults = writeToShard(forward, sourceId, destinationId, uuid, state)        
-        List(forwardResults) foreach {
-          _ foreach {
-            case Return(id) => currSuccesses = id :: currSuccesses
-            case Throw(e) => currErrs = e :: currErrs
-          }
-        }
-      
+    val forwardResults = writeToShard(forward, userId, itemId, source,action,score,createDate,status,createType)
+    List(forwardResults) foreach {
+      _ foreach {
+        case Return(id) => currSuccesses = id :: currSuccesses
+        case Throw(e) => currErrs = e :: currErrs
+      }
     }
 
     // add successful writes here, since we are only successful if an optimistic lock exception is not raised.
@@ -126,11 +118,11 @@ class Single(
     currErrs.headOption foreach { e => throw e }
   }
 
-  def writeToShard(shards: NodeSet[Shard], userId: Long, itemId: Long, source: String, action: String, updatedAtSeconds: Int, score: Double,
-  status: Status, createType: CreateType) = {
+  def writeToShard(shards: NodeSet[Shard], userId: Long, itemId: Long, source: String, action: String,  score: Double,createDate: Time,
+    status: Status, createType: CreateType) = {
     shards.skip(successes) all { (shardId, shard) =>
-      
-      shard.add(userId, itemId, source, action, updatedAt.inSeconds, score, status, createType)
+
+      shard.add(userId, itemId, source, action, score,createDate , status, createType)
 
       shardId
     }

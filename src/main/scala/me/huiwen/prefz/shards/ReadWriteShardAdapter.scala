@@ -57,8 +57,8 @@ class ReadWriteShardAdapter(shard: RoutingNode[Shard])
   def selectByUserSourceAndAction(userId: Long, source: String, action: String)
   	=shard.readOperation(_.selectByUserSourceAndAction(userId,source,action))
   	
-  def selectByUserAndSourceAndAction(userId: Long, source: String, action: String, cursor: Cursor, count: Int): (Seq[Preference], Cursor)
-  	=shard.readOperation(_.selectByUserAndSourceAndAction(userId,source,action,cursor,count))
+  def selectPageByUserSourceAndAction(userId: Long, source: String, action: String, cursor: Cursor, count: Int): (Seq[Preference], Cursor)
+  	=shard.readOperation(_.selectPageByUserSourceAndAction(userId,source,action,cursor,count))
   	
   def selectBySourcAndAction(source: String, action: String)
   	=shard.readOperation(_.selectBySourcAndAction(source,action))

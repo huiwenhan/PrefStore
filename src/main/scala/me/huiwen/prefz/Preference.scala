@@ -41,17 +41,16 @@ case class Preference(userId: Long, itemId: Long, source: String, action: String
   def toJob(tableId: Int, forwardingManager: ForwardingManager) = {
 
     new Single(
+      tableId,
       userId,
       itemId,
       source,
       action,
       score,
+      updatedAt,
       status,
       createType,
-      updatedAt,
-      tableId,
-      forwardingManager,
-      OrderedUuidGenerator)
+      forwardingManager)
   }
 
   def compare(other: Preference) = {

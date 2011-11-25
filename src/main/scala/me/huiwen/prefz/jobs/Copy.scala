@@ -18,12 +18,12 @@ package me.huiwen.prefz
 package jobs
 
 import com.twitter.gizzard.scheduler._
-import com.twitter.gizzard.shards.{ShardId, RoutingNode}
+import com.twitter.gizzard.shards.{ ShardId, RoutingNode }
 import com.twitter.gizzard.nameserver.NameServer
 import com.twitter.gizzard.Stats
 import com.twitter.util.TimeConversions._
 import conversions.Numeric._
-import shards.{Shard, ReadWriteShardAdapter}
+import shards.{ Shard, ReadWriteShardAdapter }
 
 object Copy {
   type CopyCursor = (Cursor, Cursor)
@@ -34,23 +34,25 @@ object Copy {
 }
 
 class CopyFactory(nameServer: NameServer, scheduler: JobScheduler)
-      extends CopyJobFactory[Shard] {
+  extends CopyJobFactory[Shard] {
   def apply(sourceShardId: ShardId, destinationShardId: ShardId) =
-    new MetadataCopy(sourceShardId, destinationShardId, MetadataCopy.START, Copy.COUNT,
-                     nameServer, scheduler)
+    {
+      new MetadataCopy(sourceShardId, destinationShardId, MetadataCopy.START, Copy.COUNT,
+        nameServer, scheduler)
+    }
 }
 class CopyParser(nameServer: NameServer, scheduler: JobScheduler)
-      extends CopyJobParser[Shard] {
+  extends CopyJobParser[Shard] {
   def deserialize(attributes: Map[String, Any], sourceId: ShardId, destinationId: ShardId, count: Int) = {
     val cursor = (Cursor(attributes("cursor1").asInstanceOf[AnyVal].toLong),
-                  Cursor(attributes("cursor2").asInstanceOf[AnyVal].toLong))
+      Cursor(attributes("cursor2").asInstanceOf[AnyVal].toLong))
     new Copy(sourceId, destinationId, cursor, count, nameServer, scheduler)
   }
 }
 
 class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.CopyCursor,
-           count: Int, nameServer: NameServer, scheduler: JobScheduler)
-      extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
+  count: Int, nameServer: NameServer, scheduler: JobScheduler)
+  extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
 
   def copyPage(source: RoutingNode[Shard], dest: RoutingNode[Shard], count: Int) = {
     val Seq(sourceShard, destinationShard) = Seq(source, dest) map { new ReadWriteShardAdapter(_) }
@@ -68,4 +70,27 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cop
   def serialize = Map("cursor1" -> cursor._1.position, "cursor2" -> cursor._2.position)
 }
 
+class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.CopyCursor,
+  count: Int, nameServer: NameServer, scheduler: JobScheduler)
+  extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
 
+  def copyPage(source: RoutingNode[Shard], dest: RoutingNode[Shard], count: Int) = {
+    val Seq(sourceShard, destinationShard) = Seq(source, dest) map { new ReadWriteShardAdapter(_) }
+
+    val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
+    destinationShard.writeMetadata(items)
+    Stats.incr("edges-copy", items.size)
+    if (newCursor == MetadataCopy.END)
+      Some(new Copy(sourceShardId, destinationShardId, Copy.START, Copy.COUNT, nameServer, scheduler))
+    else
+      Some(new MetadataCopy(sourceShardId, destinationShardId, newCursor, count, nameServer, scheduler))
+  }
+
+  def serialize = Map("cursor" -> cursor.position)
+}
+
+object MetadataCopy {
+  type CopyCursor = Cursor
+  val START = Cursor.Start
+  val END = Cursor.End
+}
