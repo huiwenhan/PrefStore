@@ -72,7 +72,7 @@ class Single(
   source: String,
   action: String,
   score: Double,
-    createDate: Time,
+  createDate: Time,
   status: Status,
   createType: CreateType,
   forwardingManager: ForwardingManager,

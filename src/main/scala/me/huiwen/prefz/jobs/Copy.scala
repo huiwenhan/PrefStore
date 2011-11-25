@@ -35,11 +35,7 @@ object Copy {
 
 class CopyFactory(nameServer: NameServer, scheduler: JobScheduler)
   extends CopyJobFactory[Shard] {
-  def apply(sourceShardId: ShardId, destinationShardId: ShardId) =
-    {
-      new MetadataCopy(sourceShardId, destinationShardId, MetadataCopy.START, Copy.COUNT,
-        nameServer, scheduler)
-    }
+ 
 }
 class CopyParser(nameServer: NameServer, scheduler: JobScheduler)
   extends CopyJobParser[Shard] {
@@ -70,27 +66,5 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cop
   def serialize = Map("cursor1" -> cursor._1.position, "cursor2" -> cursor._2.position)
 }
 
-class MetadataCopy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: MetadataCopy.CopyCursor,
-  count: Int, nameServer: NameServer, scheduler: JobScheduler)
-  extends CopyJob[Shard](sourceShardId, destinationShardId, count, nameServer, scheduler) {
 
-  def copyPage(source: RoutingNode[Shard], dest: RoutingNode[Shard], count: Int) = {
-    val Seq(sourceShard, destinationShard) = Seq(source, dest) map { new ReadWriteShardAdapter(_) }
 
-    val (items, newCursor) = sourceShard.selectAllMetadata(cursor, count)
-    destinationShard.writeMetadata(items)
-    Stats.incr("edges-copy", items.size)
-    if (newCursor == MetadataCopy.END)
-      Some(new Copy(sourceShardId, destinationShardId, Copy.START, Copy.COUNT, nameServer, scheduler))
-    else
-      Some(new MetadataCopy(sourceShardId, destinationShardId, newCursor, count, nameServer, scheduler))
-  }
-
-  def serialize = Map("cursor" -> cursor.position)
-}
-
-object MetadataCopy {
-  type CopyCursor = Cursor
-  val START = Cursor.Start
-  val END = Cursor.End
-}

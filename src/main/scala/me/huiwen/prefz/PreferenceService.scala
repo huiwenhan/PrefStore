@@ -55,7 +55,7 @@ class PreferenceService(
        rethrowExceptionsAsThrift
       {
         val shard = forwardingManager.find(pref.userId, graphId)
-        shard.add(pref);
+        shard.addPreference(pref);
       }
     }
 
@@ -74,7 +74,7 @@ class PreferenceService(
        rethrowExceptionsAsThrift
        {
         val shard = forwardingManager.find(pref.userId, graphId)
-        shard.delete(pref);
+        shard.deletePreference(pref);
       }
     }
     
@@ -94,7 +94,7 @@ class PreferenceService(
            rethrowExceptionsAsThrift
        {
         val shard = forwardingManager.find(pref.userId, graphId)
-        shard.update(pref);
+        shard.updatePreference(pref);
       }
   }
 

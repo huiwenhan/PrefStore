@@ -20,22 +20,23 @@ import com.twitter.gizzard.scheduler._
 import com.twitter.gizzard.shards.ShardBlackHoleException
 import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
-import me.huiwen.prefz.{Status, ForwardingManager, Cursor,CreateType}
+import me.huiwen.prefz.{ Status, ForwardingManager, Cursor, CreateType }
 import me.huiwen.prefz.conversions.Numeric._
 import me.huiwen.prefz.shards.Shard
 import me.huiwen.prefz.jobs.single.Single
-
+import me.huiwen.prefz.Preference
+import me.huiwen.prefz.Priority
 
 class MultiJobParser(
   forwardingManager: ForwardingManager,
   scheduler: PrioritizingJobScheduler,
   aggregateJobPageSize: Int)
-extends JsonJobParser {
+  extends JsonJobParser {
 
   def apply(attributes: Map[String, Any]): JsonJob = {
     val casted = attributes.asInstanceOf[Map[String, AnyVal]]
 
-    new Multi(   
+    new Multi(
       casted("graph_id").toInt,
       casted("user_id").toLong,
       casted("item_id").toLong,
@@ -45,83 +46,83 @@ extends JsonJobParser {
       Time.fromSeconds(casted("create_date").toInt),
       Status(casted("status").toInt),
       CreateType(casted("create_type").toInt),
+      Priority(casted.get("priority").map(_.toInt).getOrElse(Priority.Low.id)),
       aggregateJobPageSize,
-      casted.get("cursor").map( c => Cursor(c.toLong)).getOrElse(Cursor.Start),
+      casted.get("cursor").map(c => Cursor(c.toLong)).getOrElse(Cursor.Start),
       forwardingManager,
-      scheduler
-    )
+      scheduler)
   }
 }
 
-class Multi( 
+class Multi(
   graphId: Int,
   userId: Long,
-  itemId:Long,
-  source:String,
-  action:String,
-  score:Float,
+  itemId: Long,
+  source: String,
+  action: String,
+  score: Float,
   createDate: Time,
-  status:Status,
-  createType:CreateType,
+  status: Status,
+  createType: CreateType,
+  priority: Priority.Value,
   aggregateJobPageSize: Int,
   var cursor: Cursor,
   forwardingManager: ForwardingManager,
   scheduler: PrioritizingJobScheduler)
-extends JsonJob {
+  extends JsonJob {
 
   def this(
-	  graphId: Int,
-	  userId: Long,
-	  itemId:Long,
-	  source:String,
-	  action:String,
-	  score:Float,
-	  createDate: Time,
-	  status:Status,
-	  createType:CreateType,
-      aggregateJobPageSize: Int,
-      forwardingManager: ForwardingManager,
-      scheduler: PrioritizingJobScheduler
-  ) = {
+    graphId: Int,
+    userId: Long,
+    itemId: Long,
+    source: String,
+    action: String,
+    score: Float,
+    createDate: Time,
+    status: Status,
+    createType: CreateType,
+    priority: Priority.Value,
+    aggregateJobPageSize: Int,
+    forwardingManager: ForwardingManager,
+    scheduler: PrioritizingJobScheduler) = {
     this(
-	  graphId,
-	  userId,
-	  itemId,
-	  source,
-	  action,
-	  score,
-	  createDate,
-	  status,
-	  createType,
+      graphId,
+      userId,
+      itemId,
+      source,
+      action,
+      score,
+      createDate,
+      status,
+      createType,
+      priority,
       aggregateJobPageSize,
       Cursor.Start,
       forwardingManager,
-      scheduler
-    )
+      scheduler)
   }
 
   def toMap = Map(
     "graph_id" -> graphId,
-    "user_id" ->userId,
-    "item_id" ->itemId,
-    "source"->source,
-    "action"->action,
-    "score"->score,
+    "user_id" -> userId,
+    "item_id" -> itemId,
+    "source" -> source,
+    "action" -> action,
+    "score" -> score,
     "create_date" -> createDate.inSeconds,
     "status" -> status.id,
-    "create_type"->createType.id,
-    "cursor" -> cursor.position
-  )
+    "create_type" -> createType.id,
+    "cursor" -> cursor.position)
 
   def apply() {
     val forwardShard = forwardingManager.find(userId, graphId)
 
     while (cursor != Cursor.End) {
-      val resultWindow = forwardShard.selectByUser(userId,cursor,aggregateJobPageSize)
+      val resultWindow = forwardShard.selectByUser(userId, cursor, aggregateJobPageSize)
 
-      val chunkOfTasks = resultWindow.map { destinationId =>
-        val (a, b) = if (direction == Direction.Backward) (destinationId, sourceId) else (sourceId, destinationId)
-        singleEdgeJob(a, graphId, b, preferredState)
+      val chunkOfTasks = resultWindow.map { preference =>
+
+        singlePrefJob(graphId, preference)
       }
 
       scheduler.put(priority.id, new JsonNestedJob(chunkOfTasks))
@@ -134,8 +135,8 @@ extends JsonJob {
   }
 
   // XXX: since this job gets immediately serialized, pass null for forwardingManager and uuidGenerator.
-  protected def singlePrefJob(sourceId: Long, graphId: Int, destinationId: Long, state: Status) = {
-    new Single(graphId,userId,  itemId, updatedAt.inMillis, state, updatedAt, null, null)
+  protected def singlePrefJob(graphId: Int, pref: Preference) = {
+    new Single(graphId, pref.userId, pref.itemId, pref.source, pref.action, pref.score, pref.updatedAt, pref.status, pref.createType, null, null)
   }
 
   override def equals(o: Any) = o match {
