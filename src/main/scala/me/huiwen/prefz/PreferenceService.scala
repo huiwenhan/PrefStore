@@ -50,7 +50,7 @@ class PreferenceService(
       }
     }
 
-    def create(graphId:Int,pref: Preference)
+    def createPreference(graphId:Int,pref: Preference)
     {
        rethrowExceptionsAsThrift
       {
@@ -69,7 +69,7 @@ class PreferenceService(
       }
     }
 
-    def delete(graphId:Int,pref: Preference)
+    def deletePreference(graphId:Int,pref: Preference)
     {
        rethrowExceptionsAsThrift
        {
@@ -89,7 +89,7 @@ class PreferenceService(
       
    }
 
-  def update(graphId:Int,pref: Preference)
+  def updatePreference(graphId:Int,pref: Preference)
   {
            rethrowExceptionsAsThrift
        {
@@ -98,11 +98,14 @@ class PreferenceService(
       }
   }
 
-  def selectByUserItemSourceAndAction(graphId:Int,userId: Long, itemId: Long, source: String, action: String):Option[Preference] = 
+  def selectByUserItemSourceAndAction(graphId:Int,userId: Long, itemId: Long, source: String, action: String):Preference = 
   {
      rethrowExceptionsAsThrift {
         val shard = forwardingManager.find(userId, graphId)
-        shard.selectByUserItemSourceAndAction(userId,itemId,source,action)     
+        shard.selectByUserItemSourceAndAction(userId,itemId,source,action)
+        .getOrElse {
+        throw new PrefException("Record not found: (%d, %d)".format(userId,itemId))
+      }
     }   
   }
   def selectByUserSourceAndAction(userId: Long, source: String, action: String)
@@ -117,27 +120,58 @@ class PreferenceService(
     }   
   }
   
-   def selectBySourcAndAction(source: String, action: String)
+   def selectBySourcAndAction(graphId:Int,source: String, action: String): Seq[Preference]=
    {
-     
-     
+     rethrowExceptionsAsThrift {
+        val shard = forwardingManager.find(0, graphId)
+        shard.selectBySourcAndAction(source,action)     
+    }  
    }
-  def selectBySourcAndAction(graphId:Int,source: String, action: String, cursor: (Cursor, Cursor), count: Int)
+  def selectPageBySourcAndAction(graphId:Int,source: String, action: String, cursor: (Cursor, Cursor), count: Int)
   {
        rethrowExceptionsAsThrift {
         val shard = forwardingManager.find(0, graphId)
-        shard.selectBySourcAndAction(source,action,cursor,count)     
+        shard.selectPageBySourcAndAction(source,action,cursor,count)     
     }  
     
   }
   
 
- def selectUserIdsBySource(source: String)
+ def selectUserIdsBySource(source: String): List[Preference]=
  {
-  
+  throw(new PrefException(""))
  }
   
 
+  def selectByUser(graphId:Int,userId: Long):Seq[Preference]=
+  {
+   
+    rethrowExceptionsAsThrift {
+        val shard = forwardingManager.find(0, graphId)
+        shard.selectByUser(userId)     
+    }  
+  }
+   
+  def selectPageByUser(graphId:Int,userId: Long, cursor: Cursor, count: Int)=
+  {
+    rethrowExceptionsAsThrift {
+        val shard = forwardingManager.find(0, graphId)
+        shard.selectPageByUser(userId,cursor,count)     
+    }  
+  }
+  def selectAll(graphId:Int):Seq[Preference]=
+  {
+    rethrowExceptionsAsThrift {
+        val shard = forwardingManager.find(0, graphId)
+        shard.selectAll()     
+    }  
+  }
+ def selectAllPage(graphId:Int,cursor: (Cursor, Cursor), count: Int)={
+   rethrowExceptionsAsThrift {
+        val shard = forwardingManager.find(0, graphId)
+        shard.selectAllPage(cursor,count)     
+    }  
+ }
 
   private def countAndRethrow(e: Throwable) = {
     Stats.incr("exceptions-" + e.getClass.getName.split("\\.").last)
@@ -168,6 +202,7 @@ class PreferenceService(
         exceptionLog.error(e, "Unhandled error in PreferenceService", e)
         log.error("Unhandled error in PreferenceService: " + e.toString)
         throw(new PrefException(e.toString))
+    
     }
   }
 }

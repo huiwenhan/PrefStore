@@ -31,6 +31,7 @@ import com.twitter.util.Time
 import com.twitter.util.TimeConversions._
 import com.mysql.jdbc.exceptions.MySQLTransactionRollbackException
 import me.huiwen.prefz._
+import thrift.PrefException
 
 object QueryClass {
   val Select = QuerulousQueryClass.Select
@@ -101,7 +102,42 @@ class SqlShard(
   private val randomGenerator = new Random
 
   import QueryClass._
-
+  def addPreference(pref: Preference)
+  {
+    
+  }
+  
+  def add(userId: Long, itemId: Long, source: String, action: String, score: Double,updatedAt: Time, 
+    status: Status, createType: CreateType)
+  {
+    
+  }
+  
+  def delete(userId: Long, itemId: Long, source: String, action: String)
+  {
+    
+  }
+  
+  def deletePreference(pref: Preference)
+  {
+    
+  }
+  
+   def update(userId: Long, itemId: Long, source: String, action: String,  score: Double,updatedAt: Time,
+    status: Status, createType: CreateType)
+   {
+     
+   }
+   
+   def updatePreference(pref: Preference)
+   {
+     
+   }
+   
+   def writeCopies(Preference: Seq[Preference])
+   {
+     
+   }
   def selectByUserItemSourceAndAction(
     userId: Long, itemId: Long, source: String, action: String) :Option[Preference]=
     {
@@ -109,8 +145,19 @@ class SqlShard(
           + tablePrefix + "_preference WHERE user_id = ? And item_id = ? AND source = ? and action = ?", userId, itemId, source, action) { row =>
         makePreference(row)
       }
+     
     }
-  def selectByUserSourceAndAction(userId: Long, source: String, action: String,cursor:Cursor,count:Int):(Seq[Preference],Cursor) = {
+  
+  def selectByUserSourceAndAction(userId: Long, source: String, action: String): Seq[Preference]=
+  {
+     val prefs = new mutable.ArrayBuffer[Preference]
+    lowLatencyQueryEvaluator.select(SelectSingle, "SELECT * FROM " + tablePrefix + "_preference WHERE user_id=? and source = ? and action = ?", userId,source, action)
+    { row =>
+      prefs+=makePreference(row)
+    }
+    prefs
+  }
+  def selectPageByUserSourceAndAction(userId: Long, source: String, action: String,cursor:Cursor,count:Int):(Seq[Preference],Cursor) = {
    val prefs = new mutable.ArrayBuffer[Preference]
 	var nextCursor  = Cursor.Start
 	var retCursor = Cursor.End
@@ -132,10 +179,12 @@ class SqlShard(
 	(prefs,retCursor)
   }
 
-  def selectBySourcAndAction(source: String, action: String) = {
-    lowLatencyQueryEvaluator.selectOne(SelectSingle, "SELECT * FROM " + tablePrefix + "_preference WHERE  source = ? and action = ?", source, action) { row =>
-      makePreference(row)
+  def selectBySourcAndAction(source: String, action: String) :Seq[Preference]= {
+    val prefs = new mutable.ArrayBuffer[Preference]
+    lowLatencyQueryEvaluator.select(SelectSingle, "SELECT * FROM " + tablePrefix + "_preference WHERE  source = ? and action = ?", source, action) { row =>
+      prefs+=makePreference(row)
     }
+    prefs
   }
 
  def selectPageBySourcAndAction(source: String, action: String,cursor:(Cursor,Cursor),count:Int) 
@@ -163,10 +212,14 @@ class SqlShard(
   }
   def selectUserIdsBySource(source: String) =
     {
-
+	  throw new PrefException("")
     }
 
-  def selectByUser(userId: Long, cursor: Cursor, count: Int):ResultWindow[Preference]=
+  def selectByUser(userId: Long):Seq[Preference]=
+  {
+    throw new PrefException("")
+  }
+  def selectPageByUser(userId: Long, cursor: Cursor, count: Int):ResultWindow[Preference]=
   {
     val prefs = new mutable.ArrayBuffer[(Preference,Cursor)]
 	val query =   "SELECT * FROM " + tablePrefix + "_preference  Use INDEX (idx_userid_item_id) WHERE  user_id =?  and  item_id >?  order by item_id limit ?"
@@ -179,7 +232,12 @@ class SqlShard(
 	new ResultWindow(page,count,cursor)
   }
   
-  def selectAll(cursor: (Cursor, Cursor), count: Int):(Seq[Preference], (Cursor,Cursor))=
+  
+  def selectAll():Seq[Preference]=
+  {
+    throw new PrefException("")
+  }
+  def selectAllPage(cursor: (Cursor, Cursor), count: Int):(Seq[Preference], (Cursor,Cursor))=
   {
  	val prefs = new mutable.ArrayBuffer[Preference]
 	var nextCursor  = (Cursor.Start,Cursor.End)

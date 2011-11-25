@@ -25,55 +25,40 @@ import com.twitter.util.TimeConversions._
 class ReadWriteShardAdapter(shard: RoutingNode[Shard])
   extends Shard {
 
-  
+  def bulkUnsafeInsertPreferences(prefs: Seq[Preference]) = shard.write.all(_.bulkUnsafeInsertPreferences(prefs))
 
-  def bulkUnsafeInsertPreferences(prefs: Seq[Preference]) 
-  	= shard.write.all(_.bulkUnsafeInsertPreferences(prefs))
+  def writeCopies(edges: Seq[Preference]) = shard.write.all(_.writeCopies(edges))
 
-  def writeCopies(edges: Seq[Preference]) 
-  	= shard.write.all(_.writeCopies(edges))
+  def add(userId: Long, itemId: Long, source: String, action: String, score: Double, createdTime: Time, status: Status, createType: CreateType) = shard.write.all(_.add(userId, itemId, source, action, score, createdTime, status, createType))
 
-  def add(userId: Long, itemId: Long, source: String, action: String, score: Double,createdTime: Time, status: Status, createType: CreateType) 
-  	= shard.write.all(_.add(userId,itemId,source,action,score,createdTime,status,createType))
+  def addPreference(pref: Preference) = shard.write.all(_.addPreference(pref))
 
+  def delete(userId: Long, itemId: Long, source: String, action: String) = shard.write.all(_.delete(userId, itemId, source, action))
 
-  def addPreference(pref: Preference) 
-  	= shard.write.all(_.addPreference(pref))
+  def deletePreference(pref: Preference) = shard.write.all(_.deletePreference(pref))
 
-  def delete(userId: Long, itemId: Long, source: String, action: String)
-  	=shard.write.all(_.delete(userId,itemId,source,action))
+  def update(userId: Long, itemId: Long, source: String, action: String, score: Double, createdTime: Time, status: Status, createType: CreateType) = shard.write.all(_.update(userId, itemId, source, action, score, createdTime, status, createType))
+  def updatePreference(pref: Preference) = shard.write.all(_.updatePreference(pref))
 
-  def deletePreference(pref: Preference)
-  	=shard.write.all(_.deletePreference(pref))
-  	
-  def update(userId: Long, itemId: Long, source: String, action: String,  score: Double,createdTime: Time,status: Status, createType: CreateType)
-  	= shard.write.all(_.update(userId,itemId,source,action,score,createdTime,status,createType))
-  def updatePreference(pref: Preference)
-  = shard.write.all(_.updatePreference(pref))
-  
-  def selectByUserItemSourceAndAction(userId: Long, itemId: Long, source: String, action: String) 
-  	=shard.read.any(_.selectByUserItemSourceAndAction(userId,itemId,source,action))
-  
-  def selectByUserSourceAndAction(userId: Long, source: String, action: String)
-  	=shard.read.any(_.selectByUserSourceAndAction(userId,source,action))
-  	
-  def selectPageByUserSourceAndAction(userId: Long, source: String, action: String, cursor: Cursor, count: Int): (Seq[Preference], Cursor)
-  	=shard.read.any(_.selectPageByUserSourceAndAction(userId,source,action,cursor,count))
-  	
-  def selectBySourcAndAction(source: String, action: String)
-  	=shard.read.any(_.selectBySourcAndAction(source,action))
-  	
-  def selectBySourcAndAction(source: String, action: String, cursor: (Cursor, Cursor), count: Int)
-   =shard.read.any(_.selectBySourcAndAction(source,action,cursor,count))
+  def selectByUserItemSourceAndAction(userId: Long, itemId: Long, source: String, action: String) = shard.read.any(_.selectByUserItemSourceAndAction(userId, itemId, source, action))
 
- def selectUserIdsBySource(source: String)
-  =shard.read.any(_.selectUserIdsBySource(source))
+  def selectByUserSourceAndAction(userId: Long, source: String, action: String) = shard.read.any(_.selectByUserSourceAndAction(userId, source, action))
 
-def selectAll(cursor: (Cursor, Cursor), count: Int):(Seq[Preference], (Cursor,Cursor))
- =shard.read.any(_.selectAll(cursor,count))
-  
-def selectByUser(userId: Long):ResultWindow[Preference]
-   =shard.read.any(_.selectByUser(userId))
+  def selectPageByUserSourceAndAction(userId: Long, source: String, action: String, cursor: Cursor, count: Int): (Seq[Preference], Cursor) = shard.read.any(_.selectPageByUserSourceAndAction(userId, source, action, cursor, count))
+
+  def selectBySourcAndAction(source: String, action: String) = shard.read.any(_.selectBySourcAndAction(source, action))
+
+  def selectPageBySourcAndAction(source: String, action: String, cursor: (Cursor, Cursor), count: Int) = shard.read.any(_.selectPageBySourcAndAction(source, action, cursor, count))
+
+  def selectUserIdsBySource(source: String) = shard.read.any(_.selectUserIdsBySource(source))
+
+  def selectAllPage(cursor: (Cursor, Cursor), count: Int): (Seq[Preference], (Cursor, Cursor)) = shard.read.any(_.selectAllPage(cursor, count))
+
+  def selectAll() = shard.read.any(_.selectAll())
+
+  def selectByUser(userId: Long):Seq[Preference] = shard.read.any(_.selectByUser(userId))
+
+  def selectPageByUser(userId: Long, cursor: Cursor, count: Int): ResultWindow[Preference] = shard.read.any(_.selectPageByUser(userId, cursor, count))
 
 }
 

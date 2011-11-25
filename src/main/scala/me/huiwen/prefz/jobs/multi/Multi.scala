@@ -118,7 +118,7 @@ class Multi(
     val forwardShard = forwardingManager.find(userId, graphId)
 
     while (cursor != Cursor.End) {
-      val resultWindow = forwardShard.selectByUser(userId, cursor, aggregateJobPageSize)
+      val resultWindow = forwardShard.selectPageByUser(userId, cursor, aggregateJobPageSize)
 
       val chunkOfTasks = resultWindow.map { preference =>
 

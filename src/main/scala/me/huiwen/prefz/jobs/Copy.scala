@@ -53,7 +53,7 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cop
   def copyPage(source: RoutingNode[Shard], dest: RoutingNode[Shard], count: Int) = {
     val Seq(sourceShard, destinationShard) = Seq(source, dest) map { new ReadWriteShardAdapter(_) }
 
-    val (items, newCursor) = sourceShard.selectAll(cursor, count)
+    val (items, newCursor) = sourceShard.selectAllPage(cursor, count)
     destinationShard.writeCopies(items)
     Stats.incr("edges-copy", items.size)
     if (newCursor == Copy.END) {
