@@ -40,10 +40,7 @@ class TestQueryEvaluator(label: String) extends QueryEvaluator {
     QueryClass.SelectModify -> QueryTimeout(5.seconds),
     QueryClass.SelectCopy   -> QueryTimeout(15.seconds),
     QueryClass.Execute      -> QueryTimeout(5.seconds),
-    QueryClass.SelectSingle -> QueryTimeout(100.millis),
-    QueryClass.SelectIntersection         -> QueryTimeout(100.millis),
-    QueryClass.SelectIntersectionSmall    -> QueryTimeout(100.millis),
-    QueryClass.SelectMetadata             -> QueryTimeout(100.millis)
+    QueryClass.SelectSingle -> QueryTimeout(100.millis)
   )
 
   override def apply(stats: StatsCollector, dbStatsFactory: Option[DatabaseFactory => DatabaseFactory], queryStatsFactory: Option[QueryFactory => QueryFactory]) = {
@@ -69,7 +66,7 @@ new FlockDB {
 
     val connection = new Connection with Credentials {
       val hostnames = Seq("localhost")
-      val database = "flock_edges_test"
+      val database = "prefz_test"
     }
   })
 
@@ -90,10 +87,10 @@ new FlockDB {
 
   val databaseConnection = new Credentials {
     val hostnames = Seq("localhost")
-    val database = "edges_test"
+    val database = "prefz_test"
   }
 
-  val edgesQueryEvaluator = new TestQueryEvaluator("edges")
+  val edgesQueryEvaluator = new TestQueryEvaluator("prefz")
   val lowLatencyQueryEvaluator = edgesQueryEvaluator
   val materializingQueryEvaluator = edgesQueryEvaluator
 
@@ -118,9 +115,9 @@ new FlockDB {
   }
 
   val jobQueues = Map(
-    Priority.High.id   -> new TestScheduler("edges"),
+    Priority.High.id   -> new TestScheduler("prefz"),
     Priority.Medium.id -> new TestScheduler("copy"),
-    Priority.Low.id    -> new TestScheduler("edges_slow")
+    Priority.Low.id    -> new TestScheduler("prefz_slow")
   )
 
 

@@ -33,7 +33,7 @@ class ProductionQueryEvaluator extends QueryEvaluator {
 class ProductionNameServerReplica(host: String) extends Mysql {
   val connection = new Connection with Credentials {
     val hostnames = Seq(host)
-    val database = "prefdb_development"
+    val database = "prefz_development"
   }
 
   queryEvaluator = new ProductionQueryEvaluator {
@@ -43,8 +43,12 @@ class ProductionNameServerReplica(host: String) extends Mysql {
     }
 
     query.timeouts = Map(
-      QueryClass.Select -> QueryTimeout(1.second),
-      QueryClass.Execute -> QueryTimeout(1.second)
+      QueryClass.Select                  -> QueryTimeout(1.second),
+      QueryClass.Execute                 -> QueryTimeout(1.second),
+      QueryClass.SelectCopy              -> QueryTimeout(15.seconds),
+      QueryClass.SelectModify            -> QueryTimeout(3.seconds),
+      QueryClass.SelectSingle            -> QueryTimeout(1.second)
+    
     )
   }
 }
@@ -75,7 +79,7 @@ new PrefStore {
 
   val databaseConnection = new Credentials {
     val hostnames = Seq("localhost")
-    val database = "edges_development"
+    val database = "prefz_development"
     urlOptions = Map("rewriteBatchedStatements" -> "true")
   }
 
@@ -115,9 +119,9 @@ new PrefStore {
   }
 
   val jobQueues = Map(
-    Priority.High.id    -> new DevelopmentScheduler("prefs") { threads = 32 },
+    Priority.High.id    -> new DevelopmentScheduler("prefz") { threads = 32 },
     Priority.Medium.id  -> new DevelopmentScheduler("copy") { threads = 12; errorRetryDelay = 60.seconds },
-    Priority.Low.id     -> new DevelopmentScheduler("prefs_slow") { threads = 2 }
+    Priority.Low.id     -> new DevelopmentScheduler("prefz_slow") { threads = 2 }
   )
 
   val adminConfig = new AdminServiceConfig {

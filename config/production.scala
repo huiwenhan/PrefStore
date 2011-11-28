@@ -11,7 +11,7 @@ import me.huiwen.prefz.config._
 
 trait Credentials extends Connection {
   val username = "root"
-  val password = ""
+  val password = "root"
 }
 
 class ProductionQueryEvaluator extends QueryEvaluator {
@@ -30,7 +30,7 @@ class ProductionQueryEvaluator extends QueryEvaluator {
 class ProductionNameServerReplica(host: String) extends Mysql {
   val connection = new Connection with Credentials {
     val hostnames = Seq(host)
-    val database = "flock_edges_production"
+    val database = "prefz_production"
   }
 
   queryEvaluator = new ProductionQueryEvaluator {
@@ -44,10 +44,8 @@ class ProductionNameServerReplica(host: String) extends Mysql {
       QueryClass.Execute                 -> QueryTimeout(1.second),
       QueryClass.SelectCopy              -> QueryTimeout(15.seconds),
       QueryClass.SelectModify            -> QueryTimeout(3.seconds),
-      QueryClass.SelectSingle            -> QueryTimeout(1.second),
-      QueryClass.SelectIntersection      -> QueryTimeout(1.second),
-      QueryClass.SelectIntersectionSmall -> QueryTimeout(1.second),
-      QueryClass.SelectMetadata          -> QueryTimeout(1.second)
+      QueryClass.SelectSingle            -> QueryTimeout(1.second)
+    
     )
   }
 }
@@ -64,8 +62,8 @@ new PrefStore {
   jobRelay        = NoJobRelay
 
   nameServerReplicas = Seq(
-    new ProductionNameServerReplica("flockdb001.twitter.com"),
-    new ProductionNameServerReplica("flockdb002.twitter.com")
+    new ProductionNameServerReplica("prefz01.huiwen.me"),
+    new ProductionNameServerReplica("prefz02.huiwen.me")
   )
 
   jobInjector.timeout               = 100.millis
@@ -81,7 +79,7 @@ new PrefStore {
 
   val databaseConnection = new Credentials {
     val hostnames = Seq("localhost")
-    val database = "edges"
+    val database = "prefz"
     urlOptions = Map("rewriteBatchedStatements" -> "true")
   }
 
@@ -111,9 +109,9 @@ new PrefStore {
   }
 
   val jobQueues = Map(
-    Priority.High.id    -> new ProductionScheduler("edges") { threads = 32 },
+    Priority.High.id    -> new ProductionScheduler("prefz") { threads = 32 },
     Priority.Medium.id  -> new ProductionScheduler("copy") { threads = 12; errorRetryDelay = 60.seconds },
-    Priority.Low.id     -> new ProductionScheduler("edges_slow") { threads = 2 }
+    Priority.Low.id     -> new ProductionScheduler("prefz_slow") { threads = 2 }
   )
 
   val adminConfig = new AdminServiceConfig {
