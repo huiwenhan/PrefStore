@@ -305,7 +305,7 @@ class SqlShard(
 
   private def updatePreference(transaction: Transaction, pref: Preference,
     oldPref: Preference): Int = {
-    if ((oldPref.updatedAtSeconds == pref.updatedAtSeconds)) return 0
+    if ((oldPref.createDateSeconds == pref.createDateSeconds)) return 0
 
     try {
       transaction.execute("UPDATE " + tablePrefix + "_preference SET updated_at = ?, " +

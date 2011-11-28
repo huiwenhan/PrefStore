@@ -122,14 +122,17 @@ class PrefStoreThriftAdapter(val prefz: PreferenceService, val scheduler: Priori
   import scala.collection.JavaConversions._
   import com.twitter.gizzard.thrift.conversions.Sequences._
   import me.huiwen.prefz.conversions.Preference._
+  import me.huiwen.prefz.conversions.PrefResults._
   import me.huiwen.prefz.conversions.Page._
   import me.huiwen.prefz.conversions.Results._
+  import me.huiwen.prefz.conversions.Status._
+  import me.huiwen.prefz.conversions.CreateType._
   import com.twitter.gizzard.shards.ShardException
   import thrift.PrefException
 
-  def create(graphId: Int, userId: Long, itemId: Long, source: String, action: String, createDate: Int, score: Double,
-    status: Status, createType: CreateType) {
-    prefz.create(graphId, userId, itemId, source, action, score, createDate, status, createType);
+  def create(graphId: Int, userId: Long, itemId: Long, source: String, action: String,  score: Double,createDate: Int,
+    status: thrift.Status, createType: thrift.CreateType) {
+    prefz.create(graphId, userId, itemId, source, action, score, createDate, status.fromThrift, createType.fromThrift);
   }
 
   def createPreference(graphId: Int, pref: thrift.Preference) {
@@ -145,27 +148,38 @@ class PrefStoreThriftAdapter(val prefz: PreferenceService, val scheduler: Priori
   }
 
   def update(graphId: Int, userId: Long, itemId: Long, source: String, action: String, score: Double, createDateInSeconds: Int,
-    status: Status, createType: CreateType) {
-    prefz.update(graphId, userId, itemId, source, action, score, Time(createDateInSeconds), status, createType);
+    status: thrift.Status, createType: thrift.CreateType) {
+    prefz.update(graphId, userId, itemId, source, action, score, Time.fromSeconds(createDateInSeconds), status.fromThrift, createType.fromThrift);
 
   }
 
+  
   def updatePreference(graphId: Int, pref: thrift.Preference) {
     prefz.updatePreference(graphId, pref.fromThrift);
   }
 
-  def selectByUserItemSourceAndAction(graphId: Int, userId: Long, itemId: Long, source: String, action: String) {
+  def remove(graphId: Int, userId: Long, itemId: Long, source: String, action: String) {
+    prefz.delete(graphId, userId, itemId, source, action);
+
+  }
+  
+  def removePreference(graphId: Int, pref: thrift.Preference) {
+    prefz.deletePreference(graphId, pref.fromThrift);
+  }
+  
+  def selectByUserItemSourceAndAction(graphId: Int, userId: Long, itemId: Long, source: java.lang.String, action: java.lang.String): thrift.Preference = {
     prefz.selectByUserItemSourceAndAction(graphId, userId, itemId, source, action).toThrift
   }
-  def selectByUserSourceAndAction(userId: Long, source: String, action: String) {
-    prefz.selectByUserSourceAndAction(userId, source, action)
+  def selectByUserSourceAndAction(graphId: Int,userId: Long, source: String, action: String): JList[thrift.Preference]= {
+    prefz.selectByUserSourceAndAction(graphId,userId, source, action).map { _.toThrift }
   }
-  def selectPageByUserSourceAndAction(graphId: Int, userId: Long, source: String, action: String, cursor: Cursor, count: Int) {
-    prefz.selectPageByUserSourceAndAction(graphId, userId, source, action, cursor, count)
+  def selectPageByUserSourceAndAction(graphId: Int, userId: Long, source: java.lang.String, action: java.lang.String, page:thrift.Page):thrift.PrefResults ={
+    val (prefs,retcursor)=prefz.selectPageByUserSourceAndAction(graphId, userId, source, action, Cursor(page.getCursor()), page.getCount())
+    new thrift.PrefResults(prefs.map{_.toThrift },retcursor.position,page.count)
   }
 
-  def selectBySourcAndAction(graphId: Int,source: String, action: String) {
-    prefz.selectBySourcAndAction(graphId,source, action).map { _.toThrift }
+  def selectBySourcAndAction(graphId: Int, source: String, action: String): JList[thrift.Preference] = {
+    prefz.selectBySourcAndAction(graphId, source, action).map { _.toThrift }
 
   }
   def selectBySourcAndAction(graphId: Int, source: String, action: String, cursor: (Cursor, Cursor), count: Int) {
@@ -176,20 +190,23 @@ class PrefStoreThriftAdapter(val prefz: PreferenceService, val scheduler: Priori
   def selectUserIdsBySource(source: String) {
     prefz.selectUserIdsBySource(source)
   }
-  
-  def selectByUser(userId: Long){
-   
+
+  def selectByUser(graphId: Int,userId: Long) : JList[thrift.Preference]={
+
+     prefz.selectByUser(graphId,graphId).map { _.toThrift }
   }
-   
-  def selectPageByUser(userId: Long, cursor: Cursor, count: Int)
-  {
+
+  def selectPageByUser(graphId: Int,userId: Long, page:thrift.Page) :thrift.PrefResults ={
+    prefz.selectPageByUser(graphId, userId, Cursor(page.getCursor()), page.getCount()).toThrift
     
   }
-  def selectAll():Seq[Preference]
-  {
+  def selectAll(graphId: Int): JList[thrift.Preference] =
+    {
+      prefz.selectAll(graphId).map { _.toThrift }
+    }
+  def selectAllPage(graphId: Int,paiPage:thrift.PairPage) {
+
+     val (prefs,(userCursor,itemCursor)) =prefz.selectAllPage(graphId,(Cursor(paiPage.getUser_cursor()),Cursor(paiPage.getItem_cursor())),paiPage.getCount())
   }
- def selectAllPage(cursor: (Cursor, Cursor), count: Int){
-   
- }
 
 }

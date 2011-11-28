@@ -24,13 +24,14 @@ import me.huiwen.prefz
 object Preference {
   class RichPrefzPreference(pref: prefz.Preference) {
     def toThrift = new thrift.Preference(pref.userId, pref.itemId, 
-                                   pref.source,pref.action,pref.score,pref.updatedAt.inSeconds, pref.status.id,pref.createType.id)
+                                   pref.source,pref.action,pref.score,pref.updatedAt.inSeconds, 
+                                   thrift.Status.findByValue(pref.status.id),thrift.CreateType.findByValue(pref.createType.id))
   }
   implicit def RichPrefzPreference(pref: prefz.Preference) = new RichPrefzPreference(pref)
 
   class RichThriftPreference(pref: thrift.Preference) {
     def fromThrift = new prefz.Preference(pref.user_id, pref.item_id,
-                                   pref.source,pref.action,Time.fromSeconds(pref.create_date),pref.score,Status(pref.status),CreateType(pref.create_type))
+                                   pref.source,pref.action,Time.fromSeconds(pref.create_date),pref.score,prefz.Status(pref.status.getValue()),prefz.CreateType(pref.create_type.getValue()))
   }
   implicit def RichThriftPreference(pref: thrift.Preference) = new RichThriftPreference(pref)
 }

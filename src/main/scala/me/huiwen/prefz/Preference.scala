@@ -21,18 +21,18 @@ import me.huiwen.prefz.jobs.single._
 import com.twitter.gizzard.scheduler.{ PrioritizingJobScheduler, JsonJob }
 
 object Preference {
-  def apply(userId: Long, itemId: Long, source: String, action: String, updatedAt: Time, score: Double,
-    status: Status, createType: CreateType) = new Preference(userId, itemId, source, action, updatedAt.inSeconds, score, status, createType)
+  def apply(userId: Long, itemId: Long, source: String, action: String, createDate: Time, score: Double,
+    status: Status, createType: CreateType) = new Preference(userId, itemId, source, action, createDate.inSeconds, score, status, createType)
 }
 
-case class Preference(userId: Long, itemId: Long, source: String, action: String, updatedAtSeconds: Int, score: Double,
+case class Preference(userId: Long, itemId: Long, source: String, action: String, createDateSeconds: Int, score: Double,
   status: Status, createType: CreateType) extends Ordered[Preference] {
 
   def this(userId: Long, itemId: Long, source: String, action: String, updatedAt: Time, score: Double,
     status: Status, createType: CreateType) =
     this(userId, itemId, source, action, updatedAt.inSeconds, score, status, createType)
 
-  val updatedAt = Time.fromSeconds(updatedAtSeconds)
+  val updatedAt = Time.fromSeconds(createDateSeconds)
 
   def schedule(tableId: Int, forwardingManager: ForwardingManager, scheduler: PrioritizingJobScheduler, priority: Int) = {
     scheduler.put(priority, toJob(tableId, forwardingManager))

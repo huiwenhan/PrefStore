@@ -35,6 +35,11 @@ object Copy {
 
 class CopyFactory(nameServer: NameServer, scheduler: JobScheduler)
   extends CopyJobFactory[Shard] {
+    
+
+def apply(sourceShardId: ShardId, destinationShardId: ShardId) =
+    new Copy(sourceShardId, destinationShardId, Copy.START, Copy.COUNT,
+                     nameServer, scheduler)
  
 }
 class CopyParser(nameServer: NameServer, scheduler: JobScheduler)
@@ -65,6 +70,3 @@ class Copy(sourceShardId: ShardId, destinationShardId: ShardId, cursor: Copy.Cop
 
   def serialize = Map("cursor1" -> cursor._1.position, "cursor2" -> cursor._2.position)
 }
-
-
-

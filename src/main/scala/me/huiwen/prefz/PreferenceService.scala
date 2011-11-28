@@ -46,7 +46,7 @@ class PreferenceService(
       rethrowExceptionsAsThrift
       {
         val shard = forwardingManager.find(userId, graphId)
-        shard.add(userId,itemId,source,action,score,Time(createdTime),status,createType);
+        shard.add(userId,itemId,source,action,score,Time.fromSeconds(createdTime),status,createType);
       }
     }
 
@@ -108,11 +108,12 @@ class PreferenceService(
       }
     }   
   }
-  def selectByUserSourceAndAction(userId: Long, source: String, action: String)
+  def selectByUserSourceAndAction(graphId:Int,userId: Long, source: String, action: String):Seq[Preference]=
   {
-    
+    throw(new PrefException(""))
   }
   def selectPageByUserSourceAndAction(graphId:Int,userId: Long, source: String, action: String, cursor: Cursor, count: Int)
+  	:(Seq[Preference],Cursor)=
   {
      rethrowExceptionsAsThrift {
         val shard = forwardingManager.find(userId, graphId)
@@ -152,7 +153,7 @@ class PreferenceService(
     }  
   }
    
-  def selectPageByUser(graphId:Int,userId: Long, cursor: Cursor, count: Int)=
+  def selectPageByUser(graphId:Int,userId: Long, cursor: Cursor, count: Int):ResultWindow[Preference]=
   {
     rethrowExceptionsAsThrift {
         val shard = forwardingManager.find(0, graphId)
@@ -166,7 +167,7 @@ class PreferenceService(
         shard.selectAll()     
     }  
   }
- def selectAllPage(graphId:Int,cursor: (Cursor, Cursor), count: Int)={
+ def selectAllPage(graphId:Int,cursor: (Cursor, Cursor), count: Int):(Seq[Preference],(Cursor,Cursor))={
    rethrowExceptionsAsThrift {
         val shard = forwardingManager.find(0, graphId)
         shard.selectAllPage(cursor,count)     
