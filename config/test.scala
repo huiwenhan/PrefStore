@@ -1,0 +1,143 @@
+
+import com.twitter.gizzard.config._
+import com.twitter.gizzard.TransactionalStatsProvider
+import com.twitter.querulous.config._
+import com.twitter.querulous.database.DatabaseFactory
+import com.twitter.querulous.query.QueryFactory
+import com.twitter.querulous.StatsCollector
+import com.twitter.conversions.time._
+import com.twitter.conversions.storage._
+import com.twitter.ostrich.admin.config.AdminServiceConfig
+import com.twitter.logging.Level
+import com.twitter.logging.config.{FileHandlerConfig, LoggerConfig}
+import me.huiwen.prefz.Priority
+import me.huiwen.prefz.config._
+import me.huiwen.prefz.shards.QueryClass
+import me.huiwen.prefz.{MemoizedQueryEvaluators, Priority}
+
+trait Credentials extends Connection {
+  import scala.collection.JavaConversions._
+  val env = System.getenv().toMap
+  val username = env.get("DB_USERNAME").getOrElse("root")
+  val password = env.get("DB_PASSWORD").getOrElse("root")
+  urlOptions = Map("connectTimeout" -> "0")
+}
+
+class TestQueryEvaluator(label: String) extends QueryEvaluator {
+//  query.debug = DebugLog
+  database.memoize = true
+  database.pool = new ApachePoolingDatabase {
+    sizeMin = 8
+    sizeMax = 8
+//    maxWait = 0.seconds
+    minEvictableIdle = 60.seconds
+    testIdle = 1.second
+    testOnBorrow = false
+  }
+
+  query.timeouts = Map(
+    QueryClass.Select       -> QueryTimeout(100.millis),
+    QueryClass.SelectModify -> QueryTimeout(5.seconds),
+    QueryClass.SelectCopy   -> QueryTimeout(15.seconds),
+    QueryClass.Execute      -> QueryTimeout(5.seconds),
+    QueryClass.SelectSingle -> QueryTimeout(100.millis),
+    QueryClass.SelectIntersection         -> QueryTimeout(100.millis),
+    QueryClass.SelectIntersectionSmall    -> QueryTimeout(100.millis),
+    QueryClass.SelectMetadata             -> QueryTimeout(100.millis)
+  )
+
+  override def apply(stats: StatsCollector, dbStatsFactory: Option[DatabaseFactory => DatabaseFactory], queryStatsFactory: Option[QueryFactory => QueryFactory]) = {
+    try {
+      MemoizedQueryEvaluators.evaluators.getOrElseUpdate(label, { super.apply(stats, dbStatsFactory, queryStatsFactory) } )
+    } catch { case e: Throwable => e.printStackTrace(); throw e }
+  }
+}
+
+new FlockDB {
+  val server = new FlockDBServer with THsHaServer {
+    timeout = 100.millis
+    idleTimeout = 60.seconds
+    threadPool.minThreads = 250
+    threadPool.maxThreads = 250
+  }
+
+  mappingFunction = Identity
+  jobRelay        = NoJobRelay
+
+  nameServerReplicas = Seq(new Mysql {
+    queryEvaluator  = new TestQueryEvaluator("nameserver")
+
+    val connection = new Connection with Credentials {
+      val hostnames = Seq("localhost")
+      val database = "flock_edges_test"
+    }
+  })
+
+  jobInjector.timeout               = 100.milliseconds
+  jobInjector.idleTimeout           = 60.seconds
+  jobInjector.threadPool.minThreads = 30
+
+
+  val readFuture = new Future {
+    poolSize = 100
+    maxPoolSize = 100
+    keepAlive = 5.seconds
+    timeout = 500.millis
+  }
+
+
+  // Database Connectivity
+
+  val databaseConnection = new Credentials {
+    val hostnames = Seq("localhost")
+    val database = "edges_test"
+  }
+
+  val edgesQueryEvaluator = new TestQueryEvaluator("edges")
+  val lowLatencyQueryEvaluator = edgesQueryEvaluator
+  val materializingQueryEvaluator = edgesQueryEvaluator
+
+  // schedulers
+
+  class TestScheduler(val name: String) extends Scheduler {
+    jobQueueName = name + "_jobs"
+
+    val schedulerType = new KestrelScheduler {
+      path = "/tmp"
+      keepJournal = false
+      maxMemorySize = 36.megabytes
+    }
+
+    threads = 2
+    errorLimit = 25
+    errorRetryDelay = 900.seconds
+    errorStrobeInterval = 30.seconds
+    perFlushItemLimit = 1000
+    jitterRate = 0.0f
+    badJobQueue = new JsonJobLogger { name = "bad_jobs" }
+  }
+
+  val jobQueues = Map(
+    Priority.High.id   -> new TestScheduler("edges"),
+    Priority.Medium.id -> new TestScheduler("copy"),
+    Priority.Low.id    -> new TestScheduler("edges_slow")
+  )
+
+
+  // Admin/Logging
+
+  val adminConfig = new AdminServiceConfig {
+    httpPort = Some(9990)
+  }
+
+  loggers = List(new LoggerConfig {
+    level = Some(Level.INFO)
+    handlers = List(new FileHandlerConfig { filename = "test.log" })
+  })
+
+  queryStats.consumers = Seq(new AuditingTransactionalStatsConsumer {
+    names = Set("execute")
+    override def apply() = { new com.twitter.gizzard.AuditingTransactionalStatsConsumer(new com.twitter.gizzard.LoggingTransactionalStatsConsumer("audit_log") {
+      def transactionToString(t: TransactionalStatsProvider) = { t.get("job").asInstanceOf[String] }
+    }, names)}})
+}
