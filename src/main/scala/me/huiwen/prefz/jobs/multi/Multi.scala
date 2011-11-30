@@ -39,7 +39,6 @@ class MultiJobParser(
     new Multi(
       casted("graph_id").toInt,
       casted("user_id").toLong,
-      casted("item_id").toLong,
       casted("source").toString(),
       casted("action").toString(),
       casted("score").toDouble.toFloat,
@@ -57,7 +56,6 @@ class MultiJobParser(
 class Multi(
   graphId: Int,
   userId: Long,
-  itemId: Long,
   source: String,
   action: String,
   score: Float,
@@ -74,7 +72,6 @@ class Multi(
   def this(
     graphId: Int,
     userId: Long,
-    itemId: Long,
     source: String,
     action: String,
     score: Float,
@@ -88,7 +85,6 @@ class Multi(
     this(
       graphId,
       userId,
-      itemId,
       source,
       action,
       score,
@@ -105,13 +101,13 @@ class Multi(
   def toMap = Map(
     "graph_id" -> graphId,
     "user_id" -> userId,
-    "item_id" -> itemId,
     "source" -> source,
     "action" -> action,
     "score" -> score,
     "create_date" -> createDate.inSeconds,
     "status" -> status.id,
     "create_type" -> createType.id,
+    "priority" -> priority.id,
     "cursor" -> cursor.position)
 
   def apply() {

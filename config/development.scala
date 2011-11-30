@@ -34,7 +34,7 @@ class ProductionQueryEvaluator extends QueryEvaluator {
 class ProductionNameServerReplica(host: String) extends Mysql {
   val connection = new Connection with Credentials {
     val hostnames = Seq(host)
-    val database = "prefz_development"
+    val database = "nameserver_development"
   }
 
   queryEvaluator = new ProductionQueryEvaluator {

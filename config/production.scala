@@ -32,7 +32,7 @@ class ProductionQueryEvaluator extends QueryEvaluator {
 class ProductionNameServerReplica(host: String) extends Mysql {
   val connection = new Connection with Credentials {
     val hostnames = Seq(host)
-    val database = "prefz_production"
+    val database = "nameserver_production"
   }
 
   queryEvaluator = new ProductionQueryEvaluator {
@@ -81,7 +81,7 @@ new PrefStore {
 
   val databaseConnection = new Credentials {
     val hostnames = Seq("localhost")
-    val database = "prefz"
+    val database = "prefz_production"
     urlOptions = Map("rewriteBatchedStatements" -> "true")
   }
 

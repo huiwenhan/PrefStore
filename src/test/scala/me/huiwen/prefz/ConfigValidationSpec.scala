@@ -25,6 +25,7 @@ import me.huiwen.prefz
 object ConfigValidationSpec extends Specification {
   "Configuration Validation" should {
     "production.scala" >> {
+      var eval = new Eval()
       val config = Eval[prefz.config.PrefStore](new File("config/production.scala"))
       config mustNot beNull
     }

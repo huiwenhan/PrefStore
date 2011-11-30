@@ -80,7 +80,7 @@ PRIMARY KEY (user_id, item_id, source,action)
       val queryEvaluator = materializingQueryEvaluatorFactory(connection.withHost(shardInfo.hostname).withoutDatabase)
 
       queryEvaluator.execute("CREATE DATABASE IF NOT EXISTS " + connection.database)
-      queryEvaluator.execute(PREFERENCE_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_edges", shardInfo.sourceType, shardInfo.destinationType))
+      queryEvaluator.execute(PREFERENCE_TABLE_DDL.format(connection.database + "." + shardInfo.tablePrefix + "_preference", shardInfo.sourceType, shardInfo.destinationType))
     } catch {
       case e: SQLException => throw new ShardException(e.toString)
       case e: SqlQueryTimeoutException => throw new ShardTimeoutException(e.timeout, shardInfo.id, e)

@@ -77,7 +77,7 @@ class PrefStore(config: PrefStoreConfig) extends GizzardServer(config) with Serv
 
   jobCodec += ("jobs\\.(Copy|Migrate)".r, new jobs.CopyParser(nameServer, jobScheduler(Priority.Medium.id)))
 
-  val flockService = {
+  val prefService = {
     val prefs = new PreferenceService(
       forwardingManager,
       jobScheduler,
@@ -88,7 +88,7 @@ class PrefStore(config: PrefStoreConfig) extends GizzardServer(config) with Serv
   }
 
   private val loggingProxy = makeLoggingProxy[thrift.PreferenceService.Iface]()
-  lazy val loggingFlockService = loggingProxy(flockService)
+  lazy val loggingFlockService = loggingProxy(prefService)
 
   lazy val flockThriftServer = {
     val processor = new thrift.PreferenceService.Processor(

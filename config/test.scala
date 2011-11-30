@@ -50,8 +50,8 @@ class TestQueryEvaluator(label: String) extends QueryEvaluator {
   }
 }
 
-new FlockDB {
-  val server = new FlockDBServer with THsHaServer {
+new PrefStore {
+  val server = new PrefStoreServer with THsHaServer {
     timeout = 100.millis
     idleTimeout = 60.seconds
     threadPool.minThreads = 250
@@ -66,7 +66,7 @@ new FlockDB {
 
     val connection = new Connection with Credentials {
       val hostnames = Seq("localhost")
-      val database = "prefz_test"
+      val database = "nameserver_test"
     }
   })
 

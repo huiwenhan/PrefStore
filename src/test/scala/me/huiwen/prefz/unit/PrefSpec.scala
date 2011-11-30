@@ -21,19 +21,46 @@ import com.twitter.util.Time
 import org.specs.mock.{ClassMocker, JMocker}
 import jobs.single._
 
+
 object PrefSpec extends ConfiguredSpecification with JMocker with ClassMocker  {
-  val now = Time.fromSeconds(124)
-  val source = 1
-  val dest = 2
-  val pos = 0
-  val graph = 5
-  val count = 0
+    val now = Time.fromSeconds(124)
+    val graphId1 =1;
+    
+    val user1 = 1L
+    val user2 = 2L
+    val user3 = 3L
+    val user4 = 4L
+    val user5 = 5L
+    val user6 = 6L
+
+    val item1 = 1L
+    val item2 = 2L
+    val item3 = 3L
+    val item4 = 4L
+    val item5 = 5L
+    val item6 = 6L
+
+    val source1 = "media"
+    val source2 = "learning"
+
+    val action1 = "click"
+    val action2 = "download"
+
+    val score1 = 1.0f
+    val score2 = 2.0f
+
+    val createTypeDefault = CreateType.DEFAULT
+    val createTypeThumb = CreateType.THUMB
+
+    val statusValid = Status.VALID
+    val statusIgnore = Status.IGNORE
+
   val forwardingManager = mock[ForwardingManager]
 
-  "Edge" should {
+  "Pref" should {
     "becomes correct job" in {
-      val edge = new Edge(source, dest, pos, now, count, State.Normal)
-      edge.toJob(graph, forwardingManager) mustEqual new Single(source, graph, dest, pos, State.Normal, now, forwardingManager, OrderedUuidGenerator)
+      val pref = new Preference(user1,item1,source1,action1,now,score1,statusValid,createTypeDefault)
+      pref.toJob(graphId1, forwardingManager) mustEqual new Single(graphId1,user1,item1,source1,action1,score1,now,statusValid,createTypeDefault,forwardingManager)
     }
   }
 }
