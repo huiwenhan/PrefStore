@@ -17,18 +17,19 @@
 package me.huiwen.prefz
 import com.twitter.util.Eval
 import com.twitter.logging.Logger
-import com.twitter.ostrich.admin.{Service, ServiceTracker, RuntimeEnvironment, AdminHttpService}
+import com.twitter.ostrich.admin.{ Service, ServiceTracker, RuntimeEnvironment, AdminHttpService }
 import java.io.File
 
-import me.huiwen.prefz.config.{PrefStore => PrefStoreConfig}
-object  Main {
+import me.huiwen.prefz.config.{ PrefStore => PrefStoreConfig }
+object Main {
 
-    val log = Logger.get
+  val log = Logger.get
 
   var adminServer: Option[AdminHttpService] = None
 
   def main(args: Array[String]) {
     try {
+      log.info("args:" + args)
       log.info("Starting PrefStore.")
 
       val eval = new Eval

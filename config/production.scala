@@ -8,6 +8,8 @@ import com.twitter.logging.Level
 import com.twitter.logging.config._
 import me.huiwen.prefz.Priority
 import me.huiwen.prefz.config._
+import me.huiwen.prefz.shards.QueryClass
+
 
 trait Credentials extends Connection {
   val username = "root"

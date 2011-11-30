@@ -39,9 +39,6 @@ object QueryClass {
   val SelectSingle = QuerulousQueryClass("select_single")
   val SelectModify = QuerulousQueryClass("select_modify")
   val SelectCopy = QuerulousQueryClass("select_copy")
-  val SelectIntersection = QuerulousQueryClass("select_intersection")
-  val SelectIntersectionSmall = QuerulousQueryClass("select_intersection_small")
-  val SelectMetadata = QuerulousQueryClass("select_metadata")
 }
 
 class SqlShardFactory(

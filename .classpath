@@ -2,6 +2,7 @@
 <classpath>
 	<classpathentry kind="con" path="sbt.eclipse.CLASSPATH_CONTAINER"/>
 	<classpathentry kind="src" path="src/main/scala"/>
+	<classpathentry kind="src" path="src/main/test"/>
 	<classpathentry kind="src" path="target/gen-java"/>
 	<classpathentry kind="src" path="src/main/thrift"/>
 	<classpathentry kind="con" path="org.scala-ide.sdt.launching.SCALA_CONTAINER"/>
