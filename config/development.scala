@@ -89,10 +89,7 @@ new PrefStore {
       QueryClass.Execute                 -> QueryTimeout(1.second),
       QueryClass.SelectCopy              -> QueryTimeout(15.seconds),
       QueryClass.SelectModify            -> QueryTimeout(3.seconds),
-      QueryClass.SelectSingle            -> QueryTimeout(1.second),
-      QueryClass.SelectIntersection      -> QueryTimeout(1.second),
-      QueryClass.SelectIntersectionSmall -> QueryTimeout(1.second),
-      QueryClass.SelectMetadata          -> QueryTimeout(1.second)
+      QueryClass.SelectSingle            -> QueryTimeout(1.second)
     )
   }
 
