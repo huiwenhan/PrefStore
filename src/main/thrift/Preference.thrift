@@ -1,6 +1,5 @@
-namespace java com.ibm.webahead.steer.gizzard.preference.thrift
 namespace java me.huiwen.prefz.thrift
-namespace rb Preference
+namespace rb prefz
 
 enum Status {
   VALID = 0
