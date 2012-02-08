@@ -106,7 +106,7 @@ new PrefStore {
   class DevelopmentScheduler(val name: String) extends Scheduler {
     override val jobQueueName = name + "_jobs"
     val schedulerType = new KestrelScheduler {
-      val queuePath = "."
+      val queuePath = "./spool/kestrel"
     }
 
     errorLimit = 100
@@ -133,7 +133,7 @@ new PrefStore {
         duration = 60.seconds
         maxToDisplay = 10
         handler = new FileHandlerConfig {
-          filename = "development.log"
+          filename = "./log/development.log"
           roll = Policy.Hourly
         }
       }

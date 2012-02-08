@@ -64,8 +64,7 @@ new PrefStore {
   jobRelay        = NoJobRelay
 
   nameServerReplicas = Seq(
-    new ProductionNameServerReplica("prefz01.huiwen.me"),
-    new ProductionNameServerReplica("prefz02.huiwen.me")
+    new ProductionNameServerReplica("localhost")
   )
 
   jobInjector.timeout               = 100.millis
@@ -91,7 +90,7 @@ new PrefStore {
   val materializingQueryEvaluator = new ProductionQueryEvaluator {
     database.pool = new ThrottledPoolingDatabase {
       size = 1
-      openTimeout = 1.second
+      openTimeout = 10.second
     }
   }
 
@@ -99,7 +98,7 @@ new PrefStore {
     jobQueueName = name + "_jobs"
 
     val schedulerType = new KestrelScheduler {
-      path = "/var/spool/kestrel"
+      path = "./spool/kestrel"
       maxMemorySize = 36.megabytes
     }
 
@@ -128,7 +127,7 @@ new PrefStore {
           duration = 60.seconds
           maxToDisplay = 10
           handler = new FileHandlerConfig {
-            filename = "/var/log/flock/production.log"
+            filename = "./log/production.log"
             roll = Policy.Hourly
           }
         })
@@ -147,7 +146,7 @@ new PrefStore {
       level = Some(Level.INFO)
       handlers = List(new FileHandlerConfig {
         roll = Policy.Never
-        filename = "/var/log/flock/bad_jobs.log"
+        filename = "./log/bad_jobs.log"
       })
     })
 }

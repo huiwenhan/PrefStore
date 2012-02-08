@@ -100,7 +100,7 @@ new PrefStore {
     jobQueueName = name + "_jobs"
 
     val schedulerType = new KestrelScheduler {
-      path = "/tmp"
+      path = "./tmp"
       keepJournal = false
       maxMemorySize = 36.megabytes
     }
@@ -129,7 +129,7 @@ new PrefStore {
 
   loggers = List(new LoggerConfig {
     level = Some(Level.INFO)
-    handlers = List(new FileHandlerConfig { filename = "test.log" })
+    handlers = List(new FileHandlerConfig { filename = "./log/test.log" })
   })
 
   queryStats.consumers = Seq(new AuditingTransactionalStatsConsumer {
