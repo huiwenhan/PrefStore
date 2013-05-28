@@ -1,11 +1,11 @@
 <ivy-module version="1.0" xmlns:e="http://ant.apache.org/ivy/extra">
-  <info organisation="com.ibm.webahead.steer"
+  <info organisation="com.sfb.webahead.steer"
     module="prefz"
     revision="1.0"
-    e:buildpackage="com.ibm.webahead.steer.gizzard.preference"
-    e:testclass="com.ibm.webahead.steer.gizzard.preference.TestRunner"
-    e:jarclassname="com.ibm.webahead.steer.gizzard.preference.Main"
-    e:thriftpackage="com.ibm.webahead.steer.gizzard.preference.gen"
+    e:buildpackage="com.sfb.webahead.steer.gizzard.preference"
+    e:testclass="com.sfb.webahead.steer.gizzard.preference.TestRunner"
+    e:jarclassname="com.sfb.webahead.steer.gizzard.preference.Main"
+    e:thriftpackage="com.sfb.webahead.steer.gizzard.preference.gen"
   />
 
   <configurations>
